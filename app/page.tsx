@@ -189,20 +189,51 @@ export default function MCPToolsChat() {
                       <div className="whitespace-pre-wrap">{message.content}</div>
                       {message.toolInvocations && message.toolInvocations.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500 mb-1">Tools used:</p>
-                          {message.toolInvocations.map((tool, index) => (
-                            <div key={index} className="mb-2">
-                              <Badge variant="outline" className="mr-2 mb-1">
-                                {tool.toolName}
-                              </Badge>
-                              {tool.result && (
-                                <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
-                                  <span className="text-xs text-gray-500">Result: </span>
-                                  <span className="font-mono">{JSON.stringify(tool.result)}</span>
+                          <p className="text-xs text-gray-500 mb-2">Tools used:</p>
+                          {message.toolInvocations.map((tool, index) => {
+                            // Extract content from tool result
+                            let displayContent = "No result"
+
+                            if (tool.result) {
+                              try {
+                                // Handle different result formats
+                                if (typeof tool.result === "string") {
+                                  displayContent = tool.result
+                                } else if (tool.result.content) {
+                                  // Handle MCP format with content array
+                                  if (Array.isArray(tool.result.content)) {
+                                    displayContent = tool.result.content
+                                      .map((item: any) => item.text || item.content || JSON.stringify(item))
+                                      .join(" ")
+                                  } else if (typeof tool.result.content === "string") {
+                                    displayContent = tool.result.content
+                                  } else {
+                                    displayContent = JSON.stringify(tool.result.content)
+                                  }
+                                } else if (tool.result.text) {
+                                  displayContent = tool.result.text
+                                } else {
+                                  // Fallback for other formats
+                                  displayContent = JSON.stringify(tool.result)
+                                }
+                              } catch (e) {
+                                displayContent = String(tool.result)
+                              }
+                            }
+
+                            return (
+                              <div key={index} className="mb-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {tool.toolName}
+                                  </Badge>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                <div className="p-2 bg-blue-50 rounded-md border-l-2 border-blue-200">
+                                  <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
