@@ -195,11 +195,48 @@ export default function MCPToolsChat() {
     fetchUser(ticket.submitter_id)
   }
 
-  const sendTicketToChat = () => {
+  // Add a new function to search for similar tickets
+  const searchSimilarTickets = async (ticket: ZendeskTicket): Promise<ZendeskTicket[]> => {
+    try {
+      // Extract key terms from the ticket subject and description for search
+      const searchTerms = [
+        ...ticket.subject.split(" ").filter((term) => term.length > 3),
+        ...ticket.description.split(" ").filter((term) => term.length > 3),
+      ].slice(0, 5) // Limit to first 5 meaningful terms
+
+      const searchQuery = searchTerms.join(" OR ")
+
+      const response = await fetch(`/api/zendesk/search?q=${encodeURIComponent(searchQuery)}&type=ticket`)
+      if (!response.ok) {
+        throw new Error("Search failed")
+      }
+      const data = await response.json()
+
+      // Filter out the current ticket and return only solved/closed tickets
+      return (data.results || [])
+        .filter(
+          (similarTicket: ZendeskTicket) =>
+            similarTicket.id !== ticket.id && (similarTicket.status === "solved" || similarTicket.status === "closed"),
+        )
+        .slice(0, 3) // Limit to 3 most relevant similar tickets
+    } catch (error) {
+      console.error("Error searching for similar tickets:", error)
+      return []
+    }
+  }
+
+  // Update the sendTicketToChat function to include similar tickets
+  const sendTicketToChat = async () => {
     if (!selectedTicket || !selectedUser) return
 
-    // Create a comprehensive ticket context message
-    const ticketContext = `Analyseer dit Zendesk ticket:
+    // Show loading state
+    setActiveTab("chat")
+
+    // Search for similar tickets
+    const similarTickets = await searchSimilarTickets(selectedTicket)
+
+    // Create enhanced ticket context message with similar tickets
+    let ticketContext = `Analyseer dit Zendesk ticket:
 
 **Ticket #${selectedTicket.id}: ${selectedTicket.subject}**
 
@@ -218,12 +255,35 @@ ${selectedTicket.description}
 - Gebruiker ID: ${selectedUser.id}
 - Rol: ${selectedUser.role || "Niet gespecificeerd"}
 - Tijdzone: ${selectedUser.time_zone || "Niet gespecificeerd"}
-- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}
+- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}`
 
-Geef inzichten over dit ticket, stel mogelijke oplossingen voor, en identificeer patronen of problemen die aandacht nodig hebben.`
+    // Add similar tickets if found
+    if (similarTickets.length > 0) {
+      ticketContext += `
+
+**VERGELIJKBARE OPGELOSTE TICKETS:**
+Hier zijn ${similarTickets.length} vergelijkbare tickets die eerder zijn opgelost:`
+
+      similarTickets.forEach((similarTicket, index) => {
+        ticketContext += `
+
+**Vergelijkbaar Ticket #${similarTicket.id}:**
+- Onderwerp: ${similarTicket.subject}
+- Status: ${similarTicket.status}
+- Beschrijving: ${similarTicket.description}
+- Opgelost op: ${new Date(similarTicket.updated_at).toLocaleString()}`
+      })
+
+      ticketContext += `
+
+Gebruik de informatie van deze vergelijkbare opgeloste tickets om betere oplossingen en inzichten te bieden voor het huidige ticket.`
+    }
+
+    ticketContext += `
+
+Geef inzichten over dit ticket, stel mogelijke oplossingen voor gebaseerd op vergelijkbare gevallen, en identificeer patronen of problemen die aandacht nodig hebben.`
 
     setInput(ticketContext)
-    setActiveTab("chat")
   }
 
   const updateMcpConfig = () => {
@@ -433,9 +493,9 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor, en identificeer
                       {selectedTicket ? `Ticket #${selectedTicket.id}` : "Selecteer een Ticket"}
                     </CardTitle>
                     {selectedTicket && selectedUser && (
-                      <Button onClick={sendTicketToChat} className="flex items-center gap-2">
+                      <Button onClick={sendTicketToChat} className="flex items-center gap-2" disabled={loadingTickets}>
                         <Bot className="h-4 w-4" />
-                        Analyseer met AI
+                        {loadingTickets ? "Zoekt vergelijkbare tickets..." : "Analyseer met AI"}
                       </Button>
                     )}
                   </div>
@@ -615,7 +675,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor, en identificeer
                           id="stdio-args"
                           value={stdioArgs}
                           onChange={(e) => setStdioArgs(e.target.value)}
-                          placeholder="C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js"
+                          placeholder="C:\\Users\\JurreB\\Documents\\innovation\\zendesk-mcp-server\\src\\index.js"
                           className="text-xs"
                         />
                       </div>
