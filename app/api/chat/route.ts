@@ -37,24 +37,10 @@ export async function POST(req: Request) {
       const tools = mcpClient ? await mcpClient.tools() : {}
       console.log("Available tools:", Object.keys(tools))
 
-      const result = streamText({
+      const result = await streamText({
         model: azure("gpt-4o"),
         messages,
-        tools,
-        onFinish: async () => {
-          console.log("Stream finished")
-          // Close MCP client when response is finished
-          if (mcpClient) {
-            await mcpClient.close()
-          }
-        },
-        onError: async (error) => {
-          console.error("Stream error:", error)
-          // Close MCP client on error
-          if (mcpClient) {
-            await mcpClient.close()
-          }
-        },
+        tools: mcpConfig?.type !== "none" ? tools : undefined,
       })
 
       return result.toDataStreamResponse()
@@ -63,7 +49,7 @@ export async function POST(req: Request) {
 
       // Fallback to regular AI response without MCP tools
       console.log("Falling back to regular AI response")
-      const result = streamText({
+      const result = await streamText({
         model: azure("gpt-4o"),
         messages,
       })
@@ -71,10 +57,7 @@ export async function POST(req: Request) {
       return result.toDataStreamResponse()
     }
   } catch (error) {
-    console.error("API Route Error:", error)
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    console.error("Chat API error:", error)
+    return new Response("Internal Server Error", { status: 500 })
   }
 }

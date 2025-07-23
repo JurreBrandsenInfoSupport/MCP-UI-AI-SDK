@@ -1,14 +1,16 @@
 "use client"
 
 import { useChat } from "ai/react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Settings, MessageSquare, Wrench, AlertCircle, User } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Settings, MessageSquare, Wrench, AlertCircle, User, Ticket, RefreshCw, Clock, Mail } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -17,11 +19,40 @@ interface MCPConfig {
   args?: string[]
 }
 
+interface ZendeskTicket {
+  id: number
+  subject: string
+  description: string
+  status: string
+  created_at: string
+  updated_at: string
+  submitter_id: number
+  assignee_id?: number
+  priority?: string
+  type?: string
+}
+
+interface ZendeskUser {
+  id: number
+  name: string
+  email: string
+  created_at: string
+  updated_at: string
+  time_zone?: string
+  role?: string
+}
+
 export default function MCPToolsChat() {
   const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
   const [stdioCommand, setStdioCommand] = useState("node")
   const [stdioArgs, setStdioArgs] = useState("scripts/echo-mcp-server.js")
+  const [tickets, setTickets] = useState<ZendeskTicket[]>([])
+  const [selectedTicket, setSelectedTicket] = useState<ZendeskTicket | null>(null)
+  const [selectedUser, setSelectedUser] = useState<ZendeskUser | null>(null)
+  const [loadingTickets, setLoadingTickets] = useState(false)
+  const [loadingUser, setLoadingUser] = useState(false)
+  const [ticketsError, setTicketsError] = useState<string | null>(null)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
@@ -33,6 +64,52 @@ export default function MCPToolsChat() {
       console.log("Message finished:", message)
     },
   })
+
+  // Fetch tickets on component mount
+  useEffect(() => {
+    fetchTickets()
+  }, [])
+
+  const fetchTickets = async () => {
+    setLoadingTickets(true)
+    setTicketsError(null)
+    try {
+      const response = await fetch("/api/tickets")
+      if (!response.ok) {
+        throw new Error("Failed to fetch tickets")
+      }
+      const data = await response.json()
+      setTickets(data.tickets || [])
+    } catch (error) {
+      console.error("Error fetching tickets:", error)
+      setTicketsError(error instanceof Error ? error.message : "Failed to fetch tickets")
+    } finally {
+      setLoadingTickets(false)
+    }
+  }
+
+  const fetchUser = async (userId: number) => {
+    setLoadingUser(true)
+    try {
+      const response = await fetch(`/api/users/${userId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch user")
+      }
+      const data = await response.json()
+      setSelectedUser(data.user)
+    } catch (error) {
+      console.error("Error fetching user:", error)
+      setSelectedUser(null)
+    } finally {
+      setLoadingUser(false)
+    }
+  }
+
+  const handleTicketClick = (ticket: ZendeskTicket) => {
+    setSelectedTicket(ticket)
+    setSelectedUser(null)
+    fetchUser(ticket.submitter_id)
+  }
 
   const updateMcpConfig = () => {
     const config: MCPConfig = { type: mcpConfig.type }
@@ -48,482 +125,510 @@ export default function MCPToolsChat() {
     console.log("Updated MCP config:", config)
   }
 
+  const getSubjectType = (subject: string) => {
+    const lowerSubject = subject.toLowerCase()
+    if (lowerSubject.includes("bug")) return "bug"
+    if (lowerSubject.includes("vraag")) return "vraag"
+    if (lowerSubject.includes("compliment")) return "compliment"
+    if (lowerSubject.includes("klacht")) return "klacht"
+    return "unknown"
+  }
+
+  const formatUserName = (name: string) => {
+    if (name.includes(",")) {
+      const [last, first] = name.split(",").map((s: string) => s.trim())
+      return `${first} ${last}`
+    }
+    return name
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
             <Wrench className="h-8 w-8 text-blue-600" />
-            MCP Tools Chat
+            MCP Tools Chat & Zendesk Dashboard
           </h1>
-          <p className="text-gray-600">Chat with AI using Model Context Protocol (MCP) tools</p>
+          <p className="text-gray-600">Chat with AI using MCP tools and manage Zendesk tickets</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Configuration Panel */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Settings className="h-4 w-4" />
-                MCP Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="mcp-type">Transport Type</Label>
-                <Select
-                  value={mcpConfig.type}
-                  onValueChange={(value: "none" | "stdio" | "sse") => setMcpConfig({ ...mcpConfig, type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No MCP Tools</SelectItem>
-                    <SelectItem value="sse">Server-Sent Events</SelectItem>
-                    <SelectItem value="stdio">Standard I/O</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <Tabs defaultValue="tickets" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tickets" className="flex items-center gap-2">
+              <Ticket className="h-4 w-4" />
+              Zendesk Tickets
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              MCP Chat
+            </TabsTrigger>
+          </TabsList>
 
-              {mcpConfig.type === "sse" && (
-                <div>
-                  <Label htmlFor="sse-url">SSE Server URL</Label>
-                  <Input
-                    id="sse-url"
-                    value={sseUrl}
-                    onChange={(e) => setSseUrl(e.target.value)}
-                    placeholder="http://localhost:3000/sse"
-                  />
-                </div>
-              )}
-
-              {mcpConfig.type === "stdio" && (
-                <div className="space-y-2">
-                  <div>
-                    <Label htmlFor="stdio-command">Command</Label>
-                    <Input
-                      id="stdio-command"
-                      value={stdioCommand}
-                      onChange={(e) => setStdioCommand(e.target.value)}
-                      placeholder="node"
-                    />
+          <TabsContent value="tickets" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Tickets List */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Ticket className="h-4 w-4" />
+                      Recent Tickets
+                    </CardTitle>
+                    <Button variant="outline" size="sm" onClick={fetchTickets} disabled={loadingTickets}>
+                      <RefreshCw className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
+                    </Button>
                   </div>
-                  <div>
-                    <Label htmlFor="stdio-args">Arguments</Label>
-                    <Input
-                      id="stdio-args"
-                      value={stdioArgs}
-                      onChange={(e) => setStdioArgs(e.target.value)}
-                      placeholder="scripts/echo-mcp-server.js"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Button onClick={updateMcpConfig} className="w-full" size="sm">
-                Apply Configuration
-              </Button>
-
-              <div className="pt-2 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium">Status:</span>
-                  <Badge variant={mcpConfig.type === "none" ? "secondary" : "default"}>
-                    {mcpConfig.type === "none" ? "No MCP" : `MCP ${mcpConfig.type.toUpperCase()}`}
-                  </Badge>
-                </div>
-                {mcpConfig.type !== "none" && (
-                  <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Chat Interface */}
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Chat
-                {error && (
-                  <Badge variant="destructive" className="ml-auto">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Error
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[500px] overflow-y-auto space-y-4 mb-4 p-4 bg-gray-50 rounded-lg">
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-red-800">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="font-medium">Error</span>
+                </CardHeader>
+                <CardContent>
+                  {ticketsError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                      <div className="flex items-center gap-2 text-red-800">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="font-medium">Error</span>
+                      </div>
+                      <p className="text-red-700 text-sm mt-1">{ticketsError}</p>
                     </div>
-                    <p className="text-red-700 text-sm mt-1">{error.message}</p>
-                  </div>
-                )}
+                  )}
 
-                {messages.length === 0 && !error && (
-                  <div className="text-center text-gray-500 py-8">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>Start a conversation with the AI assistant</p>
-                    {mcpConfig.type !== "none" && (
-                      <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
-                    )}
-                    <div className="mt-4 text-xs text-gray-400">
-                      <p>Try: "Hello, can you help me?"</p>
-                      {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
-                    </div>
-                  </div>
-                )}
-
-                {messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[80%] p-3 rounded-lg ${
-                        message.role === "user" ? "bg-blue-600 text-white" : "bg-white text-gray-900 shadow-sm border"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                      {message.toolInvocations && message.toolInvocations.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500 mb-2">Tools used:</p>
-                          {message.toolInvocations.map((tool, index) => {
-                            // Extract content from tool result
-                            let displayContent = "No result"
-                            let isStructuredData = false
-                            let structuredData = null
-
-                            if (tool.result) {
-                              try {
-                                // Handle different result formats
-                                if (typeof tool.result === "string") {
-                                  // Try to parse as JSON first
-                                  try {
-                                    const parsed = JSON.parse(tool.result)
-                                    if (parsed && typeof parsed === "object") {
-                                      structuredData = parsed
-                                      isStructuredData = true
-                                    } else {
-                                      displayContent = tool.result
+                  <ScrollArea className="h-[600px]">
+                    <div className="space-y-2">
+                      {loadingTickets ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                        </div>
+                      ) : tickets.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <Ticket className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <p>No tickets found</p>
+                        </div>
+                      ) : (
+                        tickets.map((ticket) => {
+                          const subjectType = getSubjectType(ticket.subject)
+                          return (
+                            <div
+                              key={ticket.id}
+                              className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-blue-50 ${
+                                selectedTicket?.id === ticket.id ? "bg-blue-100 border-blue-300" : "bg-white"
+                              }`}
+                              onClick={() => handleTicketClick(ticket)}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <span className="text-sm font-medium">#{ticket.id}</span>
+                                <div className="flex gap-1">
+                                  <Badge
+                                    variant={
+                                      subjectType === "bug"
+                                        ? "destructive"
+                                        : subjectType === "compliment"
+                                          ? "default"
+                                          : "secondary"
                                     }
-                                  } catch {
-                                    displayContent = tool.result
-                                  }
-                                } else if (tool.result.content) {
-                                  // Handle MCP format with content array
-                                  if (Array.isArray(tool.result.content)) {
-                                    const contentText = tool.result.content
-                                      .map((item: any) => item.text || item.content || JSON.stringify(item))
-                                      .join(" ")
-
-                                    // Try to parse content as JSON
-                                    try {
-                                      const parsed = JSON.parse(contentText)
-                                      if (parsed && typeof parsed === "object") {
-                                        structuredData = parsed
-                                        isStructuredData = true
-                                      } else {
-                                        displayContent = contentText
-                                      }
-                                    } catch {
-                                      displayContent = contentText
-                                    }
-                                  } else if (typeof tool.result.content === "string") {
-                                    try {
-                                      const parsed = JSON.parse(tool.result.content)
-                                      if (parsed && typeof parsed === "object") {
-                                        structuredData = parsed
-                                        isStructuredData = true
-                                      } else {
-                                        displayContent = tool.result.content
-                                      }
-                                    } catch {
-                                      displayContent = tool.result.content
-                                    }
-                                  } else {
-                                    displayContent = JSON.stringify(tool.result.content)
-                                  }
-                                } else if (tool.result.text) {
-                                  displayContent = tool.result.text
-                                } else if (tool.result.error) {
-                                  displayContent = `Error: ${tool.result.error}`
-                                } else {
-                                  // Try to parse the entire result as structured data
-                                  if (typeof tool.result === "object") {
-                                    structuredData = tool.result
-                                    isStructuredData = true
-                                  } else {
-                                    displayContent = JSON.stringify(tool.result)
-                                  }
-                                }
-                              } catch (e) {
-                                displayContent = `Error parsing result: ${String(tool.result)}`
-                              }
-                            }
-
-                            // Function to render user data
-                            const renderUserData = (data: any) => {
-                              const user = data.user || data
-                              if (!user || !user.id) return null
-
-                              // Format the name - handle "Last, First" format
-                              let displayName = user.name || "Unknown User"
-                              if (displayName.includes(",")) {
-                                const [last, first] = displayName.split(",").map((s: string) => s.trim())
-                                displayName = `${first} ${last}`
-                              }
-
-                              return (
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-3">
-                                    <User className="h-5 w-5 text-blue-600" />
-                                    <div>
-                                      <h4 className="font-semibold text-lg">{displayName}</h4>
-                                      <p className="text-sm text-gray-500">User ID: {user.id}</p>
-                                    </div>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-4">
-                                    {user.email && (
-                                      <div>
-                                        <span className="text-xs font-medium text-gray-500">Email:</span>
-                                        <p className="text-sm">{user.email}</p>
-                                      </div>
-                                    )}
-                                    {user.time_zone && (
-                                      <div>
-                                        <span className="text-xs font-medium text-gray-500">Time Zone:</span>
-                                        <p className="text-sm">{user.time_zone}</p>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {user.created_at && (
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500">Created:</span>
-                                      <p className="text-sm">{new Date(user.created_at).toLocaleString()}</p>
-                                    </div>
-                                  )}
-
-                                  {user.role && (
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500">Role:</span>
-                                      <Badge variant="secondary" className="text-xs ml-2">
-                                        {user.role}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            }
-
-                            // Function to render Zendesk ticket data
-                            const renderZendeskTicket = (data: any) => {
-                              const ticket = data.ticket || data
-                              if (!ticket || !ticket.id) return null
-
-                              // Extract subject type (vraag, bug, compliment, klacht)
-                              const subject = ticket.subject || ticket.raw_subject || ""
-                              const subjectType = subject.toLowerCase().includes("bug")
-                                ? "bug"
-                                : subject.toLowerCase().includes("vraag")
-                                  ? "vraag"
-                                  : subject.toLowerCase().includes("compliment")
-                                    ? "compliment"
-                                    : subject.toLowerCase().includes("klacht")
-                                      ? "klacht"
-                                      : "unknown"
-
-                              return (
-                                <div className="space-y-3">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500">Ticket ID:</span>
-                                      <p className="text-sm font-mono">{ticket.id}</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-xs font-medium text-gray-500">Created:</span>
-                                      <p className="text-sm">{new Date(ticket.created_at).toLocaleString()}</p>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <span className="text-xs font-medium text-gray-500">Subject:</span>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <p className="text-sm">{subject}</p>
-                                      <Badge
-                                        variant={
-                                          subjectType === "bug"
-                                            ? "destructive"
-                                            : subjectType === "compliment"
-                                              ? "default"
-                                              : "secondary"
-                                        }
-                                        className="text-xs"
-                                      >
-                                        {subjectType}
-                                      </Badge>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <span className="text-xs font-medium text-gray-500">Status:</span>
-                                    <div className="mt-1">
-                                      <Badge
-                                        variant={
-                                          ticket.status === "open"
-                                            ? "destructive"
-                                            : ticket.status === "closed"
-                                              ? "default"
-                                              : "secondary"
-                                        }
-                                        className="text-xs"
-                                      >
-                                        {ticket.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <span className="text-xs font-medium text-gray-500">User (Submitter):</span>
-                                    <p className="text-sm font-mono">{ticket.submitter_id}</p>
-                                  </div>
-
-                                  <div>
-                                    <span className="text-xs font-medium text-gray-500">Description:</span>
-                                    <p className="text-sm mt-1 p-2 bg-gray-50 rounded border-l-2 border-gray-300">
-                                      {ticket.description}
-                                    </p>
-                                  </div>
-                                </div>
-                              )
-                            }
-
-                            // Function to render generic structured data
-                            const renderStructuredData = (data: any, toolName: string) => {
-                              // Check if it's user data (for get_user tool)
-                              if (toolName === "get_user" || data.user || (data.id && data.name && data.email)) {
-                                return renderUserData(data)
-                              }
-
-                              // Check if it's a Zendesk ticket
-                              if (data.ticket || (data.id && data.subject && data.status)) {
-                                return renderZendeskTicket(data)
-                              }
-
-                              // Generic object renderer
-                              return (
-                                <div className="space-y-2">
-                                  {Object.entries(data)
-                                    .slice(0, 10)
-                                    .map(([key, value]) => (
-                                      <div key={key} className="grid grid-cols-3 gap-2">
-                                        <span className="text-xs font-medium text-gray-500 truncate">{key}:</span>
-                                        <span className="text-sm col-span-2 break-words">
-                                          {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  {Object.keys(data).length > 10 && (
-                                    <p className="text-xs text-gray-400">
-                                      ... and {Object.keys(data).length - 10} more fields
-                                    </p>
-                                  )}
-                                </div>
-                              )
-                            }
-
-                            return (
-                              <div key={index} className="mb-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {tool.toolName}
+                                    className="text-xs"
+                                  >
+                                    {subjectType}
                                   </Badge>
-                                  {isStructuredData && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Structured Data
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="p-3 bg-blue-50 rounded-md border-l-2 border-blue-200">
-                                  {isStructuredData && structuredData ? (
-                                    renderStructuredData(structuredData, tool.toolName)
-                                  ) : (
-                                    <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
-                                  )}
+                                  <Badge
+                                    variant={
+                                      ticket.status === "open"
+                                        ? "destructive"
+                                        : ticket.status === "closed"
+                                          ? "default"
+                                          : "secondary"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {ticket.status}
+                                  </Badge>
                                 </div>
                               </div>
-                            )
-                          })}
-                        </div>
+                              <p className="text-sm text-gray-900 mb-2 line-clamp-2">{ticket.subject}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <Clock className="h-3 w-3" />
+                                {new Date(ticket.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          )
+                        })
                       )}
                     </div>
-                  </div>
-                ))}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
 
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-white text-gray-900 shadow-sm border p-3 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                        <span>AI is thinking...</span>
+              {/* Ticket Details */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ticket className="h-5 w-5" />
+                    {selectedTicket ? `Ticket #${selectedTicket.id}` : "Select a Ticket"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedTicket ? (
+                    <div className="space-y-6">
+                      {/* Ticket Info */}
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="font-semibold text-lg mb-2">{selectedTicket.subject}</h3>
+                          <div className="flex items-center gap-2 mb-4">
+                            <Badge
+                              variant={
+                                getSubjectType(selectedTicket.subject) === "bug"
+                                  ? "destructive"
+                                  : getSubjectType(selectedTicket.subject) === "compliment"
+                                    ? "default"
+                                    : "secondary"
+                              }
+                            >
+                              {getSubjectType(selectedTicket.subject)}
+                            </Badge>
+                            <Badge
+                              variant={
+                                selectedTicket.status === "open"
+                                  ? "destructive"
+                                  : selectedTicket.status === "closed"
+                                    ? "default"
+                                    : "secondary"
+                              }
+                            >
+                              {selectedTicket.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-500">Created:</span>
+                            <p>{new Date(selectedTicket.created_at).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">Updated:</span>
+                            <p>{new Date(selectedTicket.updated_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="font-medium text-gray-500 block mb-2">Description:</span>
+                          <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-blue-200">
+                            <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* User Info */}
+                      <div className="border-t pt-6">
+                        <h4 className="font-semibold mb-4 flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Submitter Information
+                        </h4>
+                        {loadingUser ? (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Loading user information...
+                          </div>
+                        ) : selectedUser ? (
+                          <div className="bg-white border rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-4">
+                              <User className="h-8 w-8 text-blue-600 bg-blue-100 rounded-full p-2" />
+                              <div>
+                                <h5 className="font-semibold text-lg">{formatUserName(selectedUser.name)}</h5>
+                                <p className="text-sm text-gray-500">User ID: {selectedUser.id}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 text-gray-400" />
+                                <span>{selectedUser.email}</span>
+                              </div>
+                              {selectedUser.time_zone && (
+                                <div>
+                                  <span className="font-medium text-gray-500">Time Zone:</span>
+                                  <span className="ml-2">{selectedUser.time_zone}</span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-medium text-gray-500">Member Since:</span>
+                                <span className="ml-2">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
+                              </div>
+                              {selectedUser.role && (
+                                <div>
+                                  <span className="font-medium text-gray-500">Role:</span>
+                                  <Badge variant="secondary" className="ml-2">
+                                    {selectedUser.role}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">Failed to load user information</p>
+                        )}
                       </div>
                     </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg">Select a ticket to view details</p>
+                      <p className="text-sm">
+                        Click on any ticket from the list to see its information and submitter details
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="chat" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Configuration Panel */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Settings className="h-4 w-4" />
+                    MCP Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="mcp-type">Transport Type</Label>
+                    <Select
+                      value={mcpConfig.type}
+                      onValueChange={(value: "none" | "stdio" | "sse") => setMcpConfig({ ...mcpConfig, type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No MCP Tools</SelectItem>
+                        <SelectItem value="sse">Server-Sent Events</SelectItem>
+                        <SelectItem value="stdio">Standard I/O</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <form onSubmit={handleSubmit} className="flex w-full gap-2">
-                <Input
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="Ask the AI assistant anything..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button type="submit" disabled={isLoading || !input.trim()}>
-                  Send
-                </Button>
-              </form>
-            </CardFooter>
-          </Card>
-        </div>
+
+                  {mcpConfig.type === "sse" && (
+                    <div>
+                      <Label htmlFor="sse-url">SSE Server URL</Label>
+                      <Input
+                        id="sse-url"
+                        value={sseUrl}
+                        onChange={(e) => setSseUrl(e.target.value)}
+                        placeholder="http://localhost:3000/sse"
+                      />
+                    </div>
+                  )}
+
+                  {mcpConfig.type === "stdio" && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label htmlFor="stdio-command">Command</Label>
+                        <Input
+                          id="stdio-command"
+                          value={stdioCommand}
+                          onChange={(e) => setStdioCommand(e.target.value)}
+                          placeholder="node"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="stdio-args">Arguments</Label>
+                        <Input
+                          id="stdio-args"
+                          value={stdioArgs}
+                          onChange={(e) => setStdioArgs(e.target.value)}
+                          placeholder="scripts/echo-mcp-server.js"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Button onClick={updateMcpConfig} className="w-full" size="sm">
+                    Apply Configuration
+                  </Button>
+
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium">Status:</span>
+                      <Badge variant={mcpConfig.type === "none" ? "secondary" : "default"}>
+                        {mcpConfig.type === "none" ? "No MCP" : `MCP ${mcpConfig.type.toUpperCase()}`}
+                      </Badge>
+                    </div>
+                    {mcpConfig.type !== "none" && (
+                      <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Chat Interface */}
+              <Card className="lg:col-span-3">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Chat
+                    {error && (
+                      <Badge variant="destructive" className="ml-auto">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Error
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[500px] overflow-y-auto space-y-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                    {error && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="font-medium">Error</span>
+                        </div>
+                        <p className="text-red-700 text-sm mt-1">{error.message}</p>
+                      </div>
+                    )}
+
+                    {messages.length === 0 && !error && (
+                      <div className="text-center text-gray-500 py-8">
+                        <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>Start a conversation with the AI assistant</p>
+                        {mcpConfig.type !== "none" && (
+                          <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
+                        )}
+                        <div className="mt-4 text-xs text-gray-400">
+                          <p>Try: "Hello, can you help me?"</p>
+                          {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[80%] p-3 rounded-lg ${
+                            message.role === "user"
+                              ? "bg-blue-600 text-white"
+                              : "bg-white text-gray-900 shadow-sm border"
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap">{message.content}</div>
+                          {message.toolInvocations && message.toolInvocations.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <p className="text-xs text-gray-500 mb-2">Tools used:</p>
+                              {message.toolInvocations.map((tool, index) => {
+                                let displayContent = "No result"
+
+                                if (tool.result) {
+                                  try {
+                                    if (typeof tool.result === "string") {
+                                      displayContent = tool.result
+                                    } else if (tool.result.content) {
+                                      if (Array.isArray(tool.result.content)) {
+                                        displayContent = tool.result.content
+                                          .map((item: any) => item.text || item.content || JSON.stringify(item))
+                                          .join(" ")
+                                      } else if (typeof tool.result.content === "string") {
+                                        displayContent = tool.result.content
+                                      } else {
+                                        displayContent = JSON.stringify(tool.result.content)
+                                      }
+                                    } else if (tool.result.text) {
+                                      displayContent = tool.result.text
+                                    } else {
+                                      displayContent = JSON.stringify(tool.result)
+                                    }
+                                  } catch (e) {
+                                    displayContent = String(tool.result)
+                                  }
+                                }
+
+                                return (
+                                  <div key={index} className="mb-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Badge variant="outline" className="text-xs">
+                                        {tool.toolName}
+                                      </Badge>
+                                    </div>
+                                    <div className="p-2 bg-blue-50 rounded-md border-l-2 border-blue-200">
+                                      <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {isLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-white text-gray-900 shadow-sm border p-3 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                            <span>AI is thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <form onSubmit={handleSubmit} className="flex w-full gap-2">
+                    <Input
+                      value={input}
+                      onChange={handleInputChange}
+                      placeholder="Ask the AI assistant anything..."
+                      disabled={isLoading}
+                      className="flex-1"
+                    />
+                    <Button type="submit" disabled={isLoading || !input.trim()}>
+                      Send
+                    </Button>
+                  </form>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Instructions */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
+            <CardTitle className="text-lg">Setup Instructions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">Quick Test</h4>
-              <p className="text-sm text-gray-600 mb-2">Try these simple prompts first to test the connection:</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Hello, how are you?"</li>
-                <li>• "What can you help me with?"</li>
-                <li>• "Tell me a joke"</li>
-              </ul>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-semibold mb-2 text-yellow-800">Environment Variables Required</h4>
+              <p className="text-sm text-yellow-700 mb-2">
+                To use the Zendesk integration, add these to your .env.local file:
+              </p>
+              <div className="bg-yellow-100 p-2 rounded text-xs font-mono text-yellow-800">
+                ZENDESK_DOMAIN=your-domain.zendesk.com
+                <br />
+                ZENDESK_EMAIL=your-email@company.com
+                <br />
+                ZENDESK_API_TOKEN=your-api-token
+              </div>
             </div>
             <div>
-              <h4 className="font-semibold mb-2">With Custom Server</h4>
-              <p className="text-sm text-gray-600 mb-2">If you have your custom server running, try:</p>
+              <h4 className="font-semibold mb-2">Features</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Who is user '26623239142557'?" (get_user tool)</li>
-                <li>• "Show me ticket 13237" (get_ticket tool)</li>
-                <li>• "Get user information for ID 123456"</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">With Echo MCP Server</h4>
-              <p className="text-sm text-gray-600 mb-2">If you have the echo server running, try:</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Can you echo the text 'Hello World'?"</li>
-                <li>• "Reverse the text 'OpenAI'"</li>
-                <li>• "Convert 'hello world' to uppercase"</li>
+                <li>
+                  • <strong>Zendesk Tickets:</strong> View and manage recent tickets with user information
+                </li>
+                <li>
+                  • <strong>MCP Chat:</strong> Use Model Context Protocol tools for advanced interactions
+                </li>
+                <li>
+                  • <strong>Real-time Updates:</strong> Refresh tickets to see the latest information
+                </li>
+                <li>
+                  • <strong>User Details:</strong> Click any ticket to see submitter information
+                </li>
               </ul>
             </div>
           </CardContent>
