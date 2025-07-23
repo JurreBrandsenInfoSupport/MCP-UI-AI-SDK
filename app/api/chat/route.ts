@@ -37,24 +37,10 @@ export async function POST(req: Request) {
       const tools = mcpClient ? await mcpClient.tools() : {}
       console.log("Available tools:", Object.keys(tools))
 
-      // Create system prompt based on tool permission settings
-      let systemPrompt = "You are a helpful AI assistant."
-
-      if (mcpConfig?.type !== "none" && Object.keys(tools).length > 0) {
-        if (mcpConfig.autoApproveTools) {
-          systemPrompt +=
-            " You have access to various tools and can use them freely to help the user. Use tools when they would be helpful to answer the user's request."
-        } else {
-          systemPrompt +=
-            " You have access to various tools, but you must ask for the user's permission before using any tool. When you want to use a tool, first explain what tool you want to use and why, then ask 'May I use the [tool name] tool to [purpose]?' and wait for the user's approval before proceeding."
-        }
-      }
-
       const result = streamText({
         model: azure("gpt-4o"),
-        system: systemPrompt,
         messages,
-        tools: mcpConfig?.autoApproveTools ? tools : {}, // Only provide tools if auto-approved
+        tools,
         onFinish: async () => {
           console.log("Stream finished")
           // Close MCP client when response is finished

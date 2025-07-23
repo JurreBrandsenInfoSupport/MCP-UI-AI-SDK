@@ -8,23 +8,20 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Toggle } from "@/components/ui/toggle"
-import { Settings, MessageSquare, Wrench, AlertCircle, Shield, ShieldCheck } from "lucide-react"
+import { Settings, MessageSquare, Wrench, AlertCircle } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
   url?: string
   command?: string
   args?: string[]
-  autoApproveTools?: boolean
 }
 
 export default function MCPToolsChat() {
-  const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none", autoApproveTools: false })
+  const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
   const [stdioCommand, setStdioCommand] = useState("node")
   const [stdioArgs, setStdioArgs] = useState("scripts/echo-mcp-server.js")
-  const [autoApproveTools, setAutoApproveTools] = useState(false)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
@@ -38,10 +35,7 @@ export default function MCPToolsChat() {
   })
 
   const updateMcpConfig = () => {
-    const config: MCPConfig = {
-      type: mcpConfig.type,
-      autoApproveTools: autoApproveTools,
-    }
+    const config: MCPConfig = { type: mcpConfig.type }
 
     if (mcpConfig.type === "sse") {
       config.url = sseUrl
@@ -127,35 +121,6 @@ export default function MCPToolsChat() {
                 </div>
               )}
 
-              {/* Tool Permission Toggle */}
-              {mcpConfig.type !== "none" && (
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {autoApproveTools ? (
-                        <ShieldCheck className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Shield className="h-4 w-4 text-orange-600" />
-                      )}
-                      <Label htmlFor="auto-approve" className="text-sm font-medium">
-                        Auto-approve tools
-                      </Label>
-                    </div>
-                    <Toggle
-                      id="auto-approve"
-                      pressed={autoApproveTools}
-                      onPressedChange={setAutoApproveTools}
-                      aria-label="Auto-approve tool usage"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {autoApproveTools
-                      ? "AI will use tools automatically without asking for permission"
-                      : "AI will ask for permission before using any tool (recommended)"}
-                  </p>
-                </div>
-              )}
-
               <Button onClick={updateMcpConfig} className="w-full" size="sm">
                 Apply Configuration
               </Button>
@@ -168,14 +133,7 @@ export default function MCPToolsChat() {
                   </Badge>
                 </div>
                 {mcpConfig.type !== "none" && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
-                    <div className="flex items-center gap-1">
-                      <Badge variant={autoApproveTools ? "default" : "secondary"} className="text-xs">
-                        {autoApproveTools ? "Auto-approved" : "Permission required"}
-                      </Badge>
-                    </div>
-                  </div>
+                  <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
                 )}
               </div>
             </CardContent>
@@ -212,22 +170,7 @@ export default function MCPToolsChat() {
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>Start a conversation with the AI assistant</p>
                     {mcpConfig.type !== "none" && (
-                      <div className="mt-4">
-                        <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
-                        <div className="flex items-center justify-center gap-2 mt-2">
-                          {autoApproveTools ? (
-                            <Badge variant="default" className="text-xs">
-                              <ShieldCheck className="h-3 w-3 mr-1" />
-                              Tools auto-approved
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              <Shield className="h-3 w-3 mr-1" />
-                              Permission required for tools
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+                      <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
                     )}
                     <div className="mt-4 text-xs text-gray-400">
                       <p>Try: "Hello, can you help me?"</p>
@@ -332,24 +275,6 @@ export default function MCPToolsChat() {
             <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold mb-2 text-blue-800 flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Tool Permission System
-              </h4>
-              <p className="text-sm text-blue-700 mb-2">
-                By default, the AI will ask for your permission before using any tool. This ensures you have control
-                over what actions are performed.
-              </p>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>
-                  • <strong>Permission Required (Default):</strong> AI asks before using tools
-                </li>
-                <li>
-                  • <strong>Auto-approve:</strong> AI uses tools automatically without asking
-                </li>
-              </ul>
-            </div>
             <div>
               <h4 className="font-semibold mb-2">Quick Test</h4>
               <p className="text-sm text-gray-600 mb-2">Try these simple prompts first to test the connection:</p>
