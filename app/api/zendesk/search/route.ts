@@ -1,37 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { zendeskClient } from "@/lib/zendesk-client"
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(request.url)
     const query = searchParams.get("q")
     const type = searchParams.get("type") || "ticket"
 
     if (!query) {
-      return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
+      return NextResponse.json({ error: "Search query is required" }, { status: 400 })
     }
 
-    const searchQuery = type === "ticket" ? `type:ticket ${query}` : query
-    const data = await zendeskClient.search(searchQuery)
+    try {
+      // Try to search in Zendesk
+      const response = await zendeskClient.search(query, { type })
 
-    return NextResponse.json({
-      results: data.results || [],
-      count: data.count,
-      next_page: data.next_page,
-      previous_page: data.previous_page,
-    })
-  } catch (error: any) {
-    console.error("Error searching Zendesk:", error)
+      return NextResponse.json({
+        results: response.results || [],
+        mocked: false,
+      })
+    } catch (error) {
+      console.error("Failed to search Zendesk:", error)
 
-    // Check if it's a credentials issue
-    if (error.message.includes("credentials not configured")) {
+      // Return empty results when search fails
       return NextResponse.json({
         results: [],
-        count: 0,
         mocked: true,
+        error: "Search not available - using mock data",
       })
     }
-
-    return NextResponse.json({ error: "Search failed", details: error.message }, { status: 500 })
+  } catch (error) {
+    console.error("Search API error:", error)
+    return NextResponse.json({ error: "Search failed" }, { status: 500 })
   }
 }
