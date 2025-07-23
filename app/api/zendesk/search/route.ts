@@ -3,27 +3,34 @@ import { zendeskClient } from "@/lib/zendesk-client"
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
+    const { searchParams } = new URL(request.url)
     const query = searchParams.get("q")
     const type = searchParams.get("type") || "ticket"
 
     if (!query) {
-      return NextResponse.json({ error: "Zoekterm is vereist" }, { status: 400 })
+      return NextResponse.json({ error: "Search query is required" }, { status: 400 })
     }
 
     try {
-      const response = await zendeskClient.search(`${query} type:${type}`)
+      // Try to search in Zendesk
+      const response = await zendeskClient.search(query, { type })
 
       return NextResponse.json({
         results: response.results || [],
-        count: response.count || 0,
+        mocked: false,
       })
     } catch (error) {
-      console.error("Zendesk zoeken mislukt:", error)
-      return NextResponse.json({ error: "Zoeken mislukt" }, { status: 500 })
+      console.error("Failed to search Zendesk:", error)
+
+      // Return empty results when search fails
+      return NextResponse.json({
+        results: [],
+        mocked: true,
+        error: "Search not available - using mock data",
+      })
     }
   } catch (error) {
-    console.error("API fout:", error)
-    return NextResponse.json({ error: "Zoeken mislukt" }, { status: 500 })
+    console.error("Search API error:", error)
+    return NextResponse.json({ error: "Search failed" }, { status: 500 })
   }
 }

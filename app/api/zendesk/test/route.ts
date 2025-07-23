@@ -6,11 +6,11 @@ export async function GET() {
     const result = await zendeskClient.testConnection()
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Zendesk verbindingstest mislukt:", error)
+    console.error("Zendesk connection test failed:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Verbindingstest mislukt",
+        error: error instanceof Error ? error.message : "Connection test failed",
       },
       { status: 500 },
     )

@@ -90,10 +90,10 @@ export default function MCPToolsChat() {
     api: "/api/chat",
     body: { mcpConfig },
     onError: (error) => {
-      console.error("Chat fout:", error)
+      console.error("Chat error:", error)
     },
     onFinish: (message) => {
-      console.log("Bericht voltooid:", message)
+      console.log("Message finished:", message)
     },
   })
 
@@ -120,14 +120,14 @@ export default function MCPToolsChat() {
         setConnectionStatus({
           testing: false,
           success: false,
-          error: data.error || "Verbinding mislukt",
+          error: data.error || "Connection failed",
         })
       }
     } catch (error: any) {
       setConnectionStatus({
         testing: false,
         success: false,
-        error: error.message || "Verbindingstest mislukt",
+        error: error.message || "Connection test failed",
       })
     }
   }
@@ -138,14 +138,14 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch("/api/tickets?per_page=50")
       if (!response.ok) {
-        throw new Error("Ophalen van tickets mislukt")
+        throw new Error("Failed to fetch tickets")
       }
       const data = await response.json()
       setTickets(data.tickets || [])
       setIsMocked(data.mocked || false)
     } catch (error) {
-      console.error("Fout bij ophalen tickets:", error)
-      setTicketsError(error instanceof Error ? error.message : "Ophalen van tickets mislukt")
+      console.error("Error fetching tickets:", error)
+      setTicketsError(error instanceof Error ? error.message : "Failed to fetch tickets")
     } finally {
       setLoadingTickets(false)
     }
@@ -156,12 +156,12 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch(`/api/users/${userId}`)
       if (!response.ok) {
-        throw new Error("Ophalen van gebruiker mislukt")
+        throw new Error("Failed to fetch user")
       }
       const data = await response.json()
       setSelectedUser(data.user)
     } catch (error) {
-      console.error("Fout bij ophalen gebruiker:", error)
+      console.error("Error fetching user:", error)
       setSelectedUser(null)
     } finally {
       setLoadingUser(false)
@@ -177,13 +177,13 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch(`/api/zendesk/search?q=${encodeURIComponent(searchQuery)}&type=ticket`)
       if (!response.ok) {
-        throw new Error("Zoeken mislukt")
+        throw new Error("Search failed")
       }
       const data = await response.json()
       setTickets(data.results || [])
     } catch (error) {
-      console.error("Fout bij zoeken:", error)
-      setTicketsError(error instanceof Error ? error.message : "Zoeken mislukt")
+      console.error("Error searching:", error)
+      setTicketsError(error instanceof Error ? error.message : "Search failed")
     } finally {
       setLoadingTickets(false)
     }
@@ -198,7 +198,7 @@ export default function MCPToolsChat() {
   const sendTicketToChat = () => {
     if (!selectedTicket || !selectedUser) return
 
-    // Create a comprehensive ticket context message in Dutch
+    // Create a comprehensive ticket context message
     const ticketContext = `Analyseer dit Zendesk ticket:
 
 **Ticket #${selectedTicket.id}: ${selectedTicket.subject}**
@@ -206,21 +206,21 @@ export default function MCPToolsChat() {
 **Status:** ${selectedTicket.status}
 **Prioriteit:** ${selectedTicket.priority || "Niet ingesteld"}
 **Type:** ${selectedTicket.type || "Niet ingesteld"}
-**Aangemaakt:** ${new Date(selectedTicket.created_at).toLocaleString("nl-NL")}
-**Bijgewerkt:** ${new Date(selectedTicket.updated_at).toLocaleString("nl-NL")}
+**Aangemaakt:** ${new Date(selectedTicket.created_at).toLocaleString()}
+**Bijgewerkt:** ${new Date(selectedTicket.updated_at).toLocaleString()}
 
 **Beschrijving:**
 ${selectedTicket.description}
 
 **Indiener Informatie:**
 - Naam: ${formatUserName(selectedUser.name)}
-- E-mail: ${selectedUser.email}
+- Email: ${selectedUser.email}
 - Gebruiker ID: ${selectedUser.id}
 - Rol: ${selectedUser.role || "Niet gespecificeerd"}
 - Tijdzone: ${selectedUser.time_zone || "Niet gespecificeerd"}
-- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString("nl-NL")}
+- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}
 
-Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer patronen of problemen die aandacht nodig hebben.`
+Geef inzichten over dit ticket, stel mogelijke oplossingen voor, en identificeer patronen of problemen die aandacht nodig hebben.`
 
     setInput(ticketContext)
     setActiveTab("chat")
@@ -237,7 +237,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
     }
 
     setMcpConfig(config)
-    console.log("MCP configuratie bijgewerkt:", config)
+    console.log("Updated MCP config:", config)
   }
 
   const getSubjectType = (subject: string) => {
@@ -246,7 +246,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
     if (lowerSubject.includes("vraag")) return "vraag"
     if (lowerSubject.includes("compliment")) return "compliment"
     if (lowerSubject.includes("klacht")) return "klacht"
-    return "onbekend"
+    return "unknown"
   }
 
   const formatUserName = (name: string) => {
@@ -265,7 +265,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
             <Wrench className="h-8 w-8 text-blue-600" />
             MCP Tools Chat & Zendesk Dashboard
           </h1>
-          <p className="text-gray-600">Chat met AI met behulp van MCP tools en beheer Zendesk tickets</p>
+          <p className="text-gray-600">Chat met AI met MCP tools en beheer Zendesk tickets</p>
 
           {/* Connection Status */}
           <div className="mt-4 flex items-center gap-4">
@@ -406,18 +406,14 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                                     }
                                     className="text-xs"
                                   >
-                                    {ticket.status === "open"
-                                      ? "open"
-                                      : ticket.status === "closed"
-                                        ? "gesloten"
-                                        : ticket.status}
+                                    {ticket.status}
                                   </Badge>
                                 </div>
                               </div>
                               <p className="text-sm text-gray-900 mb-2 line-clamp-2">{ticket.subject}</p>
                               <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <Clock className="h-3 w-3" />
-                                {new Date(ticket.created_at).toLocaleDateString("nl-NL")}
+                                {new Date(ticket.created_at).toLocaleDateString()}
                               </div>
                             </div>
                           )
@@ -472,11 +468,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                                     : "secondary"
                               }
                             >
-                              {selectedTicket.status === "open"
-                                ? "open"
-                                : selectedTicket.status === "closed"
-                                  ? "gesloten"
-                                  : selectedTicket.status}
+                              {selectedTicket.status}
                             </Badge>
                             {selectedTicket.priority && <Badge variant="outline">{selectedTicket.priority}</Badge>}
                           </div>
@@ -485,11 +477,11 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium text-gray-500">Aangemaakt:</span>
-                            <p>{new Date(selectedTicket.created_at).toLocaleString("nl-NL")}</p>
+                            <p>{new Date(selectedTicket.created_at).toLocaleString()}</p>
                           </div>
                           <div>
                             <span className="font-medium text-gray-500">Bijgewerkt:</span>
-                            <p>{new Date(selectedTicket.updated_at).toLocaleString("nl-NL")}</p>
+                            <p>{new Date(selectedTicket.updated_at).toLocaleString()}</p>
                           </div>
                         </div>
 
@@ -535,9 +527,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                               )}
                               <div>
                                 <span className="font-medium text-gray-500">Lid sinds:</span>
-                                <span className="ml-2">
-                                  {new Date(selectedUser.created_at).toLocaleDateString("nl-NL")}
-                                </span>
+                                <span className="ml-2">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
                               </div>
                               {selectedUser.role && (
                                 <div>
@@ -550,7 +540,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                             </div>
                           </div>
                         ) : (
-                          <p className="text-gray-500">Laden van gebruikersinformatie mislukt</p>
+                          <p className="text-gray-500">Kon gebruikersinformatie niet laden</p>
                         )}
                       </div>
                     </div>
@@ -559,7 +549,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                       <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg">Selecteer een ticket om details te bekijken</p>
                       <p className="text-sm">
-                        Klik op een ticket uit de lijst om de informatie en indiener details te zien
+                        Klik op een ticket uit de lijst om informatie en indiener details te zien
                       </p>
                     </div>
                   )}
@@ -707,7 +697,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                             <div className="mt-2 pt-2 border-t border-gray-200">
                               <p className="text-xs text-gray-500 mb-2">Gebruikte Zendesk MCP Tools:</p>
                               {message.toolInvocations.map((tool, index) => {
-                                let displayContent = "Geen resultaat"
+                                let displayContent = "No result"
 
                                 if (tool.result) {
                                   try {
@@ -811,13 +801,14 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                 <li>• De MCP server draait en toegankelijk is</li>
                 <li>• Node.js is geïnstalleerd en in je PATH</li>
                 <li>
-                  • Het server pad correct is:{" "}
+                  • Het server pad is correct:{" "}
                   <code className="bg-blue-100 px-1 rounded">
                     C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js
                   </code>
                 </li>
               </ul>
             </div>
+
             <div>
               <h4 className="font-semibold mb-2">Functies</h4>
               <ul className="text-sm text-gray-600 space-y-1">
@@ -828,7 +819,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer 
                   • <strong>MCP Integratie:</strong> Gebruik je Zendesk MCP server voor geavanceerde ticket operaties
                 </li>
                 <li>
-                  • <strong>Context-bewuste Chat:</strong> AI heeft toegang tot ticket beschrijvingen, gebruikersinfo en
+                  • <strong>Context-Bewuste Chat:</strong> AI heeft toegang tot ticket beschrijvingen, gebruikersinfo en
                   status
                 </li>
                 <li>
