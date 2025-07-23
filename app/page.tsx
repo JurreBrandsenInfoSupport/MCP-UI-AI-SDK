@@ -90,10 +90,10 @@ export default function MCPToolsChat() {
     api: "/api/chat",
     body: { mcpConfig },
     onError: (error) => {
-      console.error("Chat error:", error)
+      console.error("Chat fout:", error)
     },
     onFinish: (message) => {
-      console.log("Message finished:", message)
+      console.log("Bericht voltooid:", message)
     },
   })
 
@@ -120,14 +120,14 @@ export default function MCPToolsChat() {
         setConnectionStatus({
           testing: false,
           success: false,
-          error: data.error || "Connection failed",
+          error: data.error || "Verbinding mislukt",
         })
       }
     } catch (error: any) {
       setConnectionStatus({
         testing: false,
         success: false,
-        error: error.message || "Connection test failed",
+        error: error.message || "Verbindingstest mislukt",
       })
     }
   }
@@ -138,14 +138,14 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch("/api/tickets?per_page=50")
       if (!response.ok) {
-        throw new Error("Failed to fetch tickets")
+        throw new Error("Ophalen van tickets mislukt")
       }
       const data = await response.json()
       setTickets(data.tickets || [])
       setIsMocked(data.mocked || false)
     } catch (error) {
-      console.error("Error fetching tickets:", error)
-      setTicketsError(error instanceof Error ? error.message : "Failed to fetch tickets")
+      console.error("Fout bij ophalen tickets:", error)
+      setTicketsError(error instanceof Error ? error.message : "Ophalen van tickets mislukt")
     } finally {
       setLoadingTickets(false)
     }
@@ -156,12 +156,12 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch(`/api/users/${userId}`)
       if (!response.ok) {
-        throw new Error("Failed to fetch user")
+        throw new Error("Ophalen van gebruiker mislukt")
       }
       const data = await response.json()
       setSelectedUser(data.user)
     } catch (error) {
-      console.error("Error fetching user:", error)
+      console.error("Fout bij ophalen gebruiker:", error)
       setSelectedUser(null)
     } finally {
       setLoadingUser(false)
@@ -177,13 +177,13 @@ export default function MCPToolsChat() {
     try {
       const response = await fetch(`/api/zendesk/search?q=${encodeURIComponent(searchQuery)}&type=ticket`)
       if (!response.ok) {
-        throw new Error("Search failed")
+        throw new Error("Zoeken mislukt")
       }
       const data = await response.json()
       setTickets(data.results || [])
     } catch (error) {
-      console.error("Error searching:", error)
-      setTicketsError(error instanceof Error ? error.message : "Search failed")
+      console.error("Fout bij zoeken:", error)
+      setTicketsError(error instanceof Error ? error.message : "Zoeken mislukt")
     } finally {
       setLoadingTickets(false)
     }
@@ -198,29 +198,29 @@ export default function MCPToolsChat() {
   const sendTicketToChat = () => {
     if (!selectedTicket || !selectedUser) return
 
-    // Create a comprehensive ticket context message
-    const ticketContext = `Please analyze this Zendesk ticket:
+    // Create a comprehensive ticket context message in Dutch
+    const ticketContext = `Analyseer dit Zendesk ticket:
 
 **Ticket #${selectedTicket.id}: ${selectedTicket.subject}**
 
 **Status:** ${selectedTicket.status}
-**Priority:** ${selectedTicket.priority || "Not set"}
-**Type:** ${selectedTicket.type || "Not set"}
-**Created:** ${new Date(selectedTicket.created_at).toLocaleString()}
-**Updated:** ${new Date(selectedTicket.updated_at).toLocaleString()}
+**Prioriteit:** ${selectedTicket.priority || "Niet ingesteld"}
+**Type:** ${selectedTicket.type || "Niet ingesteld"}
+**Aangemaakt:** ${new Date(selectedTicket.created_at).toLocaleString("nl-NL")}
+**Bijgewerkt:** ${new Date(selectedTicket.updated_at).toLocaleString("nl-NL")}
 
-**Description:**
+**Beschrijving:**
 ${selectedTicket.description}
 
-**Submitter Information:**
-- Name: ${formatUserName(selectedUser.name)}
-- Email: ${selectedUser.email}
-- User ID: ${selectedUser.id}
-- Role: ${selectedUser.role || "Not specified"}
-- Time Zone: ${selectedUser.time_zone || "Not specified"}
-- Member Since: ${new Date(selectedUser.created_at).toLocaleDateString()}
+**Indiener Informatie:**
+- Naam: ${formatUserName(selectedUser.name)}
+- E-mail: ${selectedUser.email}
+- Gebruiker ID: ${selectedUser.id}
+- Rol: ${selectedUser.role || "Niet gespecificeerd"}
+- Tijdzone: ${selectedUser.time_zone || "Niet gespecificeerd"}
+- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString("nl-NL")}
 
-Please provide insights about this ticket, suggest potential solutions, and identify any patterns or issues that might need attention.`
+Geef inzichten over dit ticket, stel mogelijke oplossingen voor en identificeer patronen of problemen die aandacht nodig hebben.`
 
     setInput(ticketContext)
     setActiveTab("chat")
@@ -237,7 +237,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
     }
 
     setMcpConfig(config)
-    console.log("Updated MCP config:", config)
+    console.log("MCP configuratie bijgewerkt:", config)
   }
 
   const getSubjectType = (subject: string) => {
@@ -246,7 +246,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
     if (lowerSubject.includes("vraag")) return "vraag"
     if (lowerSubject.includes("compliment")) return "compliment"
     if (lowerSubject.includes("klacht")) return "klacht"
-    return "unknown"
+    return "onbekend"
   }
 
   const formatUserName = (name: string) => {
@@ -265,7 +265,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
             <Wrench className="h-8 w-8 text-blue-600" />
             MCP Tools Chat & Zendesk Dashboard
           </h1>
-          <p className="text-gray-600">Chat with AI using MCP tools and manage Zendesk tickets</p>
+          <p className="text-gray-600">Chat met AI met behulp van MCP tools en beheer Zendesk tickets</p>
 
           {/* Connection Status */}
           <div className="mt-4 flex items-center gap-4">
@@ -275,27 +275,27 @@ Please provide insights about this ticket, suggest potential solutions, and iden
               ) : (
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
-              Test Zendesk Connection
+              Test Zendesk Verbinding
             </Button>
 
             {connectionStatus.success === true && (
               <Badge variant="default" className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                Connected as {connectionStatus.user?.name}
+                Verbonden als {connectionStatus.user?.name}
               </Badge>
             )}
 
             {connectionStatus.success === false && (
               <Badge variant="destructive">
                 <XCircle className="h-3 w-3 mr-1" />
-                Connection Failed
+                Verbinding Mislukt
               </Badge>
             )}
 
             {isMocked && (
               <Badge variant="secondary">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                Using Mock Data
+                Gebruikt Mock Data
               </Badge>
             )}
           </div>
@@ -327,7 +327,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <Ticket className="h-4 w-4" />
-                      Recent Tickets
+                      Recente Tickets
                     </CardTitle>
                     <Button variant="outline" size="sm" onClick={fetchTickets} disabled={loadingTickets}>
                       <RefreshCw className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
@@ -337,7 +337,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                   {/* Search */}
                   <div className="flex gap-2 mt-4">
                     <Input
-                      placeholder="Search tickets..."
+                      placeholder="Zoek tickets..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && searchZendesk()}
@@ -353,7 +353,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                       <div className="flex items-center gap-2 text-red-800">
                         <AlertCircle className="h-4 w-4" />
-                        <span className="font-medium">Error</span>
+                        <span className="font-medium">Fout</span>
                       </div>
                       <p className="text-red-700 text-sm mt-1">{ticketsError}</p>
                     </div>
@@ -368,7 +368,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                       ) : tickets.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                           <Ticket className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                          <p>No tickets found</p>
+                          <p>Geen tickets gevonden</p>
                         </div>
                       ) : (
                         tickets.map((ticket) => {
@@ -406,14 +406,18 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                                     }
                                     className="text-xs"
                                   >
-                                    {ticket.status}
+                                    {ticket.status === "open"
+                                      ? "open"
+                                      : ticket.status === "closed"
+                                        ? "gesloten"
+                                        : ticket.status}
                                   </Badge>
                                 </div>
                               </div>
                               <p className="text-sm text-gray-900 mb-2 line-clamp-2">{ticket.subject}</p>
                               <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <Clock className="h-3 w-3" />
-                                {new Date(ticket.created_at).toLocaleDateString()}
+                                {new Date(ticket.created_at).toLocaleDateString("nl-NL")}
                               </div>
                             </div>
                           )
@@ -430,12 +434,12 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Ticket className="h-5 w-5" />
-                      {selectedTicket ? `Ticket #${selectedTicket.id}` : "Select a Ticket"}
+                      {selectedTicket ? `Ticket #${selectedTicket.id}` : "Selecteer een Ticket"}
                     </CardTitle>
                     {selectedTicket && selectedUser && (
                       <Button onClick={sendTicketToChat} className="flex items-center gap-2">
                         <Bot className="h-4 w-4" />
-                        Analyze with AI
+                        Analyseer met AI
                       </Button>
                     )}
                   </div>
@@ -468,7 +472,11 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                                     : "secondary"
                               }
                             >
-                              {selectedTicket.status}
+                              {selectedTicket.status === "open"
+                                ? "open"
+                                : selectedTicket.status === "closed"
+                                  ? "gesloten"
+                                  : selectedTicket.status}
                             </Badge>
                             {selectedTicket.priority && <Badge variant="outline">{selectedTicket.priority}</Badge>}
                           </div>
@@ -476,17 +484,17 @@ Please provide insights about this ticket, suggest potential solutions, and iden
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="font-medium text-gray-500">Created:</span>
-                            <p>{new Date(selectedTicket.created_at).toLocaleString()}</p>
+                            <span className="font-medium text-gray-500">Aangemaakt:</span>
+                            <p>{new Date(selectedTicket.created_at).toLocaleString("nl-NL")}</p>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-500">Updated:</span>
-                            <p>{new Date(selectedTicket.updated_at).toLocaleString()}</p>
+                            <span className="font-medium text-gray-500">Bijgewerkt:</span>
+                            <p>{new Date(selectedTicket.updated_at).toLocaleString("nl-NL")}</p>
                           </div>
                         </div>
 
                         <div>
-                          <span className="font-medium text-gray-500 block mb-2">Description:</span>
+                          <span className="font-medium text-gray-500 block mb-2">Beschrijving:</span>
                           <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-blue-200">
                             <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
                           </div>
@@ -497,12 +505,12 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                       <div className="border-t pt-6">
                         <h4 className="font-semibold mb-4 flex items-center gap-2">
                           <User className="h-4 w-4" />
-                          Submitter Information
+                          Indiener Informatie
                         </h4>
                         {loadingUser ? (
                           <div className="flex items-center gap-2 text-gray-500">
                             <RefreshCw className="h-4 w-4 animate-spin" />
-                            Loading user information...
+                            Gebruikersinformatie laden...
                           </div>
                         ) : selectedUser ? (
                           <div className="bg-white border rounded-lg p-4">
@@ -510,7 +518,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                               <User className="h-8 w-8 text-blue-600 bg-blue-100 rounded-full p-2" />
                               <div>
                                 <h5 className="font-semibold text-lg">{formatUserName(selectedUser.name)}</h5>
-                                <p className="text-sm text-gray-500">User ID: {selectedUser.id}</p>
+                                <p className="text-sm text-gray-500">Gebruiker ID: {selectedUser.id}</p>
                               </div>
                             </div>
 
@@ -521,17 +529,19 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                               </div>
                               {selectedUser.time_zone && (
                                 <div>
-                                  <span className="font-medium text-gray-500">Time Zone:</span>
+                                  <span className="font-medium text-gray-500">Tijdzone:</span>
                                   <span className="ml-2">{selectedUser.time_zone}</span>
                                 </div>
                               )}
                               <div>
-                                <span className="font-medium text-gray-500">Member Since:</span>
-                                <span className="ml-2">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
+                                <span className="font-medium text-gray-500">Lid sinds:</span>
+                                <span className="ml-2">
+                                  {new Date(selectedUser.created_at).toLocaleDateString("nl-NL")}
+                                </span>
                               </div>
                               {selectedUser.role && (
                                 <div>
-                                  <span className="font-medium text-gray-500">Role:</span>
+                                  <span className="font-medium text-gray-500">Rol:</span>
                                   <Badge variant="secondary" className="ml-2">
                                     {selectedUser.role}
                                   </Badge>
@@ -540,16 +550,16 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                             </div>
                           </div>
                         ) : (
-                          <p className="text-gray-500">Failed to load user information</p>
+                          <p className="text-gray-500">Laden van gebruikersinformatie mislukt</p>
                         )}
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
                       <Ticket className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                      <p className="text-lg">Select a ticket to view details</p>
+                      <p className="text-lg">Selecteer een ticket om details te bekijken</p>
                       <p className="text-sm">
-                        Click on any ticket from the list to see its information and submitter details
+                        Klik op een ticket uit de lijst om de informatie en indiener details te zien
                       </p>
                     </div>
                   )}
@@ -565,7 +575,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-sm">
                     <Settings className="h-4 w-4" />
-                    MCP Configuration
+                    MCP Configuratie
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -579,7 +589,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No MCP Tools</SelectItem>
+                        <SelectItem value="none">Geen MCP Tools</SelectItem>
                         <SelectItem value="sse">Server-Sent Events</SelectItem>
                         <SelectItem value="stdio">Standard I/O</SelectItem>
                       </SelectContent>
@@ -601,7 +611,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                   {mcpConfig.type === "stdio" && (
                     <div className="space-y-2">
                       <div>
-                        <Label htmlFor="stdio-command">Command</Label>
+                        <Label htmlFor="stdio-command">Commando</Label>
                         <Input
                           id="stdio-command"
                           value={stdioCommand}
@@ -610,7 +620,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                         />
                       </div>
                       <div>
-                        <Label htmlFor="stdio-args">Zendesk MCP Server Path</Label>
+                        <Label htmlFor="stdio-args">Zendesk MCP Server Pad</Label>
                         <Input
                           id="stdio-args"
                           value={stdioArgs}
@@ -623,18 +633,18 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                   )}
 
                   <Button onClick={updateMcpConfig} className="w-full" size="sm">
-                    Apply Configuration
+                    Configuratie Toepassen
                   </Button>
 
                   <div className="pt-2 border-t">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-medium">Status:</span>
                       <Badge variant={mcpConfig.type === "none" ? "secondary" : "default"}>
-                        {mcpConfig.type === "none" ? "No MCP" : `MCP ${mcpConfig.type.toUpperCase()}`}
+                        {mcpConfig.type === "none" ? "Geen MCP" : `MCP ${mcpConfig.type.toUpperCase()}`}
                       </Badge>
                     </div>
                     {mcpConfig.type !== "none" && (
-                      <p className="text-xs text-gray-500">Zendesk MCP tools will be available to the AI assistant</p>
+                      <p className="text-xs text-gray-500">Zendesk MCP tools zijn beschikbaar voor de AI assistent</p>
                     )}
                   </div>
                 </CardContent>
@@ -645,11 +655,11 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MessageSquare className="h-5 w-5" />
-                    Chat with Zendesk MCP
+                    Chat met Zendesk MCP
                     {error && (
                       <Badge variant="destructive" className="ml-auto">
                         <AlertCircle className="h-3 w-3 mr-1" />
-                        Error
+                        Fout
                       </Badge>
                     )}
                   </CardTitle>
@@ -660,7 +670,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                       <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                         <div className="flex items-center gap-2 text-red-800">
                           <AlertCircle className="h-4 w-4" />
-                          <span className="font-medium">Error</span>
+                          <span className="font-medium">Fout</span>
                         </div>
                         <p className="text-red-700 text-sm mt-1">{error.message}</p>
                       </div>
@@ -669,13 +679,13 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                     {messages.length === 0 && !error && (
                       <div className="text-center text-gray-500 py-8">
                         <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>Start a conversation with the AI assistant</p>
+                        <p>Start een gesprek met de AI assistent</p>
                         {mcpConfig.type !== "none" && (
-                          <p className="text-sm mt-2">Zendesk MCP tools are enabled and ready to use</p>
+                          <p className="text-sm mt-2">Zendesk MCP tools zijn ingeschakeld en klaar voor gebruik</p>
                         )}
                         <div className="mt-4 text-xs text-gray-400">
-                          <p>Try: "Analyze the current tickets" or "What are the most common issues?"</p>
-                          <p>Or select a ticket and click "Analyze with AI" to get detailed insights</p>
+                          <p>Probeer: "Analyseer de huidige tickets" of "Wat zijn de meest voorkomende problemen?"</p>
+                          <p>Of selecteer een ticket en klik "Analyseer met AI" voor gedetailleerde inzichten</p>
                         </div>
                       </div>
                     )}
@@ -695,9 +705,9 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                           <div className="whitespace-pre-wrap">{message.content}</div>
                           {message.toolInvocations && message.toolInvocations.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-gray-200">
-                              <p className="text-xs text-gray-500 mb-2">Zendesk MCP Tools used:</p>
+                              <p className="text-xs text-gray-500 mb-2">Gebruikte Zendesk MCP Tools:</p>
                               {message.toolInvocations.map((tool, index) => {
-                                let displayContent = "No result"
+                                let displayContent = "Geen resultaat"
 
                                 if (tool.result) {
                                   try {
@@ -747,7 +757,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                         <div className="bg-white text-gray-900 shadow-sm border p-3 rounded-lg">
                           <div className="flex items-center gap-2">
                             <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                            <span>AI is analyzing with Zendesk MCP...</span>
+                            <span>AI analyseert met Zendesk MCP...</span>
                           </div>
                         </div>
                       </div>
@@ -759,7 +769,7 @@ Please provide insights about this ticket, suggest potential solutions, and iden
                     <Input
                       value={input}
                       onChange={handleInputChange}
-                      placeholder="Ask about tickets, analyze patterns, or get insights..."
+                      placeholder="Vraag over tickets, analyseer patronen, of krijg inzichten..."
                       disabled={isLoading}
                       className="flex-1"
                     />
@@ -776,30 +786,32 @@ Please provide insights about this ticket, suggest potential solutions, and iden
         {/* Instructions */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-lg">Setup Instructions</CardTitle>
+            <CardTitle className="text-lg">Setup Instructies</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-semibold mb-2 text-yellow-800">Environment Variables Required</h4>
+              <h4 className="font-semibold mb-2 text-yellow-800">Vereiste Omgevingsvariabelen</h4>
               <p className="text-sm text-yellow-700 mb-2">
-                To use the Zendesk integration, add these to your .env.local file:
+                Om de Zendesk integratie te gebruiken, voeg deze toe aan je .env.local bestand:
               </p>
               <div className="bg-yellow-100 p-2 rounded text-xs font-mono text-yellow-800">
-                ZENDESK_SUBDOMAIN=your-subdomain
+                ZENDESK_SUBDOMAIN=jouw-subdomain
                 <br />
-                ZENDESK_EMAIL=your-email@company.com
+                ZENDESK_EMAIL=jouw-email@bedrijf.com
                 <br />
-                ZENDESK_API_TOKEN=your-api-token
+                ZENDESK_API_TOKEN=jouw-api-token
               </div>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold mb-2 text-blue-800">Zendesk MCP Server Setup</h4>
-              <p className="text-sm text-blue-700 mb-2">Your Zendesk MCP server path is pre-configured. Make sure:</p>
+              <p className="text-sm text-blue-700 mb-2">
+                Je Zendesk MCP server pad is vooraf geconfigureerd. Zorg ervoor dat:
+              </p>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• The MCP server is running and accessible</li>
-                <li>• Node.js is installed and in your PATH</li>
+                <li>• De MCP server draait en toegankelijk is</li>
+                <li>• Node.js is geïnstalleerd en in je PATH</li>
                 <li>
-                  • The server path is correct:{" "}
+                  • Het server pad correct is:{" "}
                   <code className="bg-blue-100 px-1 rounded">
                     C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js
                   </code>
@@ -807,22 +819,24 @@ Please provide insights about this ticket, suggest potential solutions, and iden
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-2">Features</h4>
+              <h4 className="font-semibold mb-2">Functies</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>
-                  • <strong>Ticket Analysis:</strong> Click "Analyze with AI" on any ticket for detailed insights
+                  • <strong>Ticket Analyse:</strong> Klik "Analyseer met AI" op elk ticket voor gedetailleerde inzichten
                 </li>
                 <li>
-                  • <strong>MCP Integration:</strong> Use your Zendesk MCP server for advanced ticket operations
+                  • <strong>MCP Integratie:</strong> Gebruik je Zendesk MCP server voor geavanceerde ticket operaties
                 </li>
                 <li>
-                  • <strong>Context-Aware Chat:</strong> AI has access to ticket descriptions, user info, and status
+                  • <strong>Context-bewuste Chat:</strong> AI heeft toegang tot ticket beschrijvingen, gebruikersinfo en
+                  status
                 </li>
                 <li>
-                  • <strong>Pattern Recognition:</strong> Ask the AI to identify trends and common issues
+                  • <strong>Patroon Herkenning:</strong> Vraag de AI om trends en veelvoorkomende problemen te
+                  identificeren
                 </li>
                 <li>
-                  • <strong>Solution Suggestions:</strong> Get AI-powered recommendations for ticket resolution
+                  • <strong>Oplossing Suggesties:</strong> Krijg AI-aangedreven aanbevelingen voor ticket oplossing
                 </li>
               </ul>
             </div>

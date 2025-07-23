@@ -2,7 +2,7 @@ import axios from "axios"
 
 class ZendeskClient {
   constructor() {
-    // Don't load credentials in constructor - load them lazily
+    // Laad credentials niet in constructor - laad ze lazy
   }
 
   getCredentials() {
@@ -14,7 +14,7 @@ class ZendeskClient {
       }
       if (!this._credentials.subdomain || !this._credentials.email || !this._credentials.apiToken) {
         console.warn(
-          "Zendesk credentials not found in environment variables. Please set ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, and ZENDESK_API_TOKEN.",
+          "Zendesk credentials niet gevonden in omgevingsvariabelen. Stel ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, en ZENDESK_API_TOKEN in.",
         )
       }
     }
@@ -36,13 +36,15 @@ class ZendeskClient {
     try {
       const { subdomain, email, apiToken } = this.getCredentials()
       if (!subdomain || !email || !apiToken) {
-        throw new Error("Zendesk credentials not configured. Please set environment variables.")
+        throw new Error("Zendesk credentials niet geconfigureerd. Stel omgevingsvariabelen in.")
       }
+
       const url = `${this.getBaseUrl()}${endpoint}`
       const headers = {
         Authorization: this.getAuthHeader(),
         "Content-Type": "application/json",
       }
+
       const response = await axios({
         method,
         url,
@@ -50,10 +52,11 @@ class ZendeskClient {
         data,
         params,
       })
+
       return response.data
     } catch (error) {
       if (error.response) {
-        throw new Error(`Zendesk API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`)
+        throw new Error(`Zendesk API Fout: ${error.response.status} - ${JSON.stringify(error.response.data)}`)
       }
       throw error
     }
@@ -276,20 +279,21 @@ class ZendeskClient {
       const { subdomain, email, apiToken } = this.getCredentials()
       if (!subdomain || !email || !apiToken) {
         throw new Error(
-          "Zendesk credentials not configured. Please set ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, and ZENDESK_API_TOKEN environment variables.",
+          "Zendesk credentials niet geconfigureerd. Stel ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, en ZENDESK_API_TOKEN omgevingsvariabelen in.",
         )
       }
-      console.log(`Testing connection to ${subdomain}.zendesk.com...`)
-      // Test connection by fetching current user info
+
+      console.log(`Test verbinding naar ${subdomain}.zendesk.com...`)
+      // Test verbinding door huidige gebruikersinfo op te halen
       const response = await this.request("GET", "/users/me.json")
       if (response && response.user) {
-        console.log(`✓ Successfully connected to Zendesk as ${response.user.name} (${response.user.email})`)
+        console.log(`✓ Succesvol verbonden met Zendesk als ${response.user.name} (${response.user.email})`)
         return { success: true, user: response.user }
       } else {
-        throw new Error("Unexpected response from Zendesk API")
+        throw new Error("Onverwacht antwoord van Zendesk API")
       }
     } catch (error) {
-      console.error(`✗ Failed to connect to Zendesk: ${error.message}`)
+      console.error(`✗ Verbinding met Zendesk mislukt: ${error.message}`)
       throw error
     }
   }

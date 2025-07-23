@@ -1,70 +1,64 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { zendeskClient } from "@/lib/zendesk-client"
 
-// Mock data for when Zendesk credentials are not available
+// Mock data voor wanneer Zendesk credentials niet beschikbaar zijn
 const mockTickets = [
   {
     id: 14975,
     subject: "Bug - Wissel - v2025.11.10",
     description: "Bijsturingsgeluid werkt niet",
     status: "open",
+    created_at: "2025-01-23T14:05:10Z",
+    updated_at: "2025-01-23T14:09:11Z",
+    submitter_id: 26623239142557,
     priority: "normal",
     type: "incident",
-    created_at: "2025-07-23T14:05:10Z",
-    updated_at: "2025-07-23T14:09:11Z",
-    submitter_id: 26623239142557,
-    assignee_id: null,
   },
   {
-    id: 14974,
-    subject: "Vraag - Login probleem",
-    description: "Kan niet inloggen met mijn account",
+    id: 14976,
+    subject: "Vraag - Installatie handleiding",
+    description: "Waar kan ik de installatie handleiding vinden voor de nieuwe versie?",
     status: "pending",
-    priority: "high",
-    type: "question",
-    created_at: "2025-07-23T13:30:15Z",
-    updated_at: "2025-07-23T13:45:22Z",
+    created_at: "2025-01-23T10:30:00Z",
+    updated_at: "2025-01-23T11:15:00Z",
     submitter_id: 26623239142558,
-    assignee_id: 12345,
+    priority: "low",
+    type: "question",
   },
   {
-    id: 14973,
-    subject: "Compliment - Geweldige service",
-    description: "Heel tevreden met de snelle hulp!",
+    id: 14977,
+    subject: "Klacht - Trage responstijd",
+    description: "De applicatie reageert zeer traag sinds de laatste update.",
+    status: "open",
+    created_at: "2025-01-23T09:45:00Z",
+    updated_at: "2025-01-23T12:30:00Z",
+    submitter_id: 26623239142559,
+    priority: "high",
+    type: "problem",
+  },
+  {
+    id: 14978,
+    subject: "Compliment - Uitstekende service",
+    description: "Ik wil graag mijn waardering uitspreken voor de snelle en professionele hulp.",
     status: "solved",
+    created_at: "2025-01-22T16:20:00Z",
+    updated_at: "2025-01-22T16:25:00Z",
+    submitter_id: 26623239142560,
     priority: "low",
     type: "task",
-    created_at: "2025-07-23T12:15:30Z",
-    updated_at: "2025-07-23T12:20:45Z",
-    submitter_id: 26623239142559,
-    assignee_id: 12346,
-  },
-  {
-    id: 14972,
-    subject: "Klacht - Trage website",
-    description: "De website laadt heel langzaam",
-    status: "open",
-    priority: "normal",
-    type: "problem",
-    created_at: "2025-07-23T11:45:12Z",
-    updated_at: "2025-07-23T11:50:33Z",
-    submitter_id: 26623239142560,
-    assignee_id: null,
   },
 ]
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
+    const searchParams = request.nextUrl.searchParams
     const perPage = searchParams.get("per_page") || "25"
-    const page = searchParams.get("page") || "1"
 
     try {
-      // Try to fetch real tickets from Zendesk
+      // Probeer echte Zendesk data op te halen
       const response = await zendeskClient.listTickets({
         per_page: Number.parseInt(perPage),
-        page: Number.parseInt(page),
-        sort_by: "created_at",
+        sort_by: "updated_at",
         sort_order: "desc",
       })
 
@@ -73,16 +67,23 @@ export async function GET(request: NextRequest) {
         mocked: false,
       })
     } catch (error) {
-      console.error("Failed to fetch tickets from Zendesk:", error)
+      console.error("Fout bij ophalen Zendesk tickets, gebruik mock data:", error)
 
-      // Return mock data when Zendesk is not available
+      // Gebruik mock data als fallback
       return NextResponse.json({
         tickets: mockTickets,
         mocked: true,
       })
     }
   } catch (error) {
-    console.error("Tickets API error:", error)
-    return NextResponse.json({ error: "Failed to fetch tickets" }, { status: 500 })
+    console.error("API fout:", error)
+    return NextResponse.json(
+      {
+        error: "Ophalen van tickets mislukt",
+        tickets: mockTickets,
+        mocked: true,
+      },
+      { status: 500 },
+    )
   }
 }
