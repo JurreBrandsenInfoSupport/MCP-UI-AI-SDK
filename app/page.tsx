@@ -85,6 +85,8 @@ export default function MCPToolsChat() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isMocked, setIsMocked] = useState(false)
   const [activeTab, setActiveTab] = useState("tickets")
+  const [similarTickets, setSimilarTickets] = useState<any[]>([])
+  const [loadingSimilarTickets, setLoadingSimilarTickets] = useState(false)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages, setInput } = useChat({
     api: "/api/chat",
@@ -189,54 +191,65 @@ export default function MCPToolsChat() {
     }
   }
 
-  const handleTicketClick = (ticket: ZendeskTicket) => {
-    setSelectedTicket(ticket)
-    setSelectedUser(null)
-    fetchUser(ticket.submitter_id)
-  }
-
-  // Add a new function to search for similar tickets
-  const searchSimilarTickets = async (ticket: ZendeskTicket): Promise<ZendeskTicket[]> => {
+  const fetchSimilarTickets = async (ticket: ZendeskTicket) => {
+    setLoadingSimilarTickets(true)
     try {
-      // Extract key terms from the ticket subject and description for search
-      const searchTerms = [
-        ...ticket.subject.split(" ").filter((term) => term.length > 3),
-        ...ticket.description.split(" ").filter((term) => term.length > 3),
-      ].slice(0, 5) // Limit to first 5 meaningful terms
+      const params = new URLSearchParams({
+        ticketId: ticket.id.toString(),
+        subject: ticket.subject,
+        description: ticket.description,
+      })
 
-      const searchQuery = searchTerms.join(" OR ")
-
-      const response = await fetch(`/api/zendesk/search?q=${encodeURIComponent(searchQuery)}&type=ticket`)
+      const response = await fetch(`/api/tickets/similar?${params}`)
       if (!response.ok) {
-        throw new Error("Search failed")
+        throw new Error("Failed to fetch similar tickets")
       }
       const data = await response.json()
-
-      // Filter out the current ticket and return only solved/closed tickets
-      return (data.results || [])
-        .filter(
-          (similarTicket: ZendeskTicket) =>
-            similarTicket.id !== ticket.id && (similarTicket.status === "solved" || similarTicket.status === "closed"),
-        )
-        .slice(0, 3) // Limit to 3 most relevant similar tickets
+      setSimilarTickets(data.similarTickets || [])
     } catch (error) {
-      console.error("Error searching for similar tickets:", error)
-      return []
+      console.error("Error fetching similar tickets:", error)
+      setSimilarTickets([])
+    } finally {
+      setLoadingSimilarTickets(false)
     }
   }
 
-  // Update the sendTicketToChat function to include similar tickets
-  const sendTicketToChat = async () => {
+  const handleTicketClick = (ticket: ZendeskTicket) => {
+    setSelectedTicket(ticket)
+    setSelectedUser(null)
+    setSimilarTickets([])
+    fetchUser(ticket.submitter_id)
+    fetchSimilarTickets(ticket)
+  }
+
+  const sendTicketToChat = () => {
     if (!selectedTicket || !selectedUser) return
 
-    // Show loading state
-    setActiveTab("chat")
+    // Create similar tickets context
+    let similarTicketsContext = ""
+    if (similarTickets.length > 0) {
+      similarTicketsContext = `
 
-    // Search for similar tickets
-    const similarTickets = await searchSimilarTickets(selectedTicket)
+**Vergelijkbare Opgeloste Tickets:**
 
-    // Create enhanced ticket context message with similar tickets
-    let ticketContext = `Analyseer dit Zendesk ticket:
+${similarTickets
+  .map(
+    (ticket, index) => `
+${index + 1}. **Ticket #${ticket.id}: ${ticket.subject}**
+   - Status: ${ticket.status}
+   - Beschrijving: ${ticket.description}
+   - Oplossing: ${ticket.solution}
+   - Opgelost in: ${ticket.resolution_time}
+   - Datum: ${new Date(ticket.updated_at).toLocaleDateString()}
+`,
+  )
+  .join("")}
+
+Gebruik deze vergelijkbare tickets om patronen te identificeren en mogelijke oplossingen voor te stellen.`
+    }
+
+    // Create a comprehensive ticket context message
+    const ticketContext = `Analyseer dit Zendesk ticket:
 
 **Ticket #${selectedTicket.id}: ${selectedTicket.subject}**
 
@@ -255,35 +268,12 @@ ${selectedTicket.description}
 - Gebruiker ID: ${selectedUser.id}
 - Rol: ${selectedUser.role || "Niet gespecificeerd"}
 - Tijdzone: ${selectedUser.time_zone || "Niet gespecificeerd"}
-- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}`
+- Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}${similarTicketsContext}
 
-    // Add similar tickets if found
-    if (similarTickets.length > 0) {
-      ticketContext += `
-
-**VERGELIJKBARE OPGELOSTE TICKETS:**
-Hier zijn ${similarTickets.length} vergelijkbare tickets die eerder zijn opgelost:`
-
-      similarTickets.forEach((similarTicket, index) => {
-        ticketContext += `
-
-**Vergelijkbaar Ticket #${similarTicket.id}:**
-- Onderwerp: ${similarTicket.subject}
-- Status: ${similarTicket.status}
-- Beschrijving: ${similarTicket.description}
-- Opgelost op: ${new Date(similarTicket.updated_at).toLocaleString()}`
-      })
-
-      ticketContext += `
-
-Gebruik de informatie van deze vergelijkbare opgeloste tickets om betere oplossingen en inzichten te bieden voor het huidige ticket.`
-    }
-
-    ticketContext += `
-
-Geef inzichten over dit ticket, stel mogelijke oplossingen voor gebaseerd op vergelijkbare gevallen, en identificeer patronen of problemen die aandacht nodig hebben.`
+Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, stel mogelijke oplossingen voor gebaseerd op eerdere succesvolle oplossingen, en identificeer problemen die aandacht nodig hebben.`
 
     setInput(ticketContext)
+    setActiveTab("chat")
   }
 
   const updateMcpConfig = () => {
@@ -493,9 +483,9 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor gebaseerd op ver
                       {selectedTicket ? `Ticket #${selectedTicket.id}` : "Selecteer een Ticket"}
                     </CardTitle>
                     {selectedTicket && selectedUser && (
-                      <Button onClick={sendTicketToChat} className="flex items-center gap-2" disabled={loadingTickets}>
+                      <Button onClick={sendTicketToChat} className="flex items-center gap-2">
                         <Bot className="h-4 w-4" />
-                        {loadingTickets ? "Zoekt vergelijkbare tickets..." : "Analyseer met AI"}
+                        Analyseer met AI
                       </Button>
                     )}
                   </div>
@@ -603,6 +593,70 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor gebaseerd op ver
                           <p className="text-gray-500">Kon gebruikersinformatie niet laden</p>
                         )}
                       </div>
+                      {/* Similar Tickets Section */}
+                      <div className="border-t pt-6">
+                        <h4 className="font-semibold mb-4 flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          Vergelijkbare Tickets
+                        </h4>
+                        {loadingSimilarTickets ? (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Vergelijkbare tickets zoeken...
+                          </div>
+                        ) : similarTickets.length > 0 ? (
+                          <div className="space-y-3">
+                            {similarTickets.map((ticket) => (
+                              <div key={ticket.id} className="bg-white border rounded-lg p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <h5 className="font-semibold text-sm">
+                                      #{ticket.id}: {ticket.subject}
+                                    </h5>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Badge
+                                        variant={ticket.status === "solved" ? "default" : "secondary"}
+                                        className="text-xs"
+                                      >
+                                        {ticket.status}
+                                      </Badge>
+                                      {ticket.resolution_time && (
+                                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          {ticket.resolution_time}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-sm text-gray-600 mb-2">
+                                  <strong>Probleem:</strong> {ticket.description}
+                                </div>
+
+                                {ticket.solution && (
+                                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                      <span className="font-medium text-green-800 text-sm">Oplossing</span>
+                                    </div>
+                                    <p className="text-sm text-green-700">{ticket.solution}</p>
+                                  </div>
+                                )}
+
+                                <div className="text-xs text-gray-500 mt-2">
+                                  Opgelost op: {new Date(ticket.updated_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-gray-500">
+                            <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                            <p className="text-sm">Geen vergelijkbare tickets gevonden</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
@@ -675,7 +729,7 @@ Geef inzichten over dit ticket, stel mogelijke oplossingen voor gebaseerd op ver
                           id="stdio-args"
                           value={stdioArgs}
                           onChange={(e) => setStdioArgs(e.target.value)}
-                          placeholder="C:\\Users\\JurreB\\Documents\\innovation\\zendesk-mcp-server\\src\\index.js"
+                          placeholder="C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js"
                           className="text-xs"
                         />
                       </div>
