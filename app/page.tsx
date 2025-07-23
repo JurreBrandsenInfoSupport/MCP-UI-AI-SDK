@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Settings, MessageSquare, Wrench, AlertCircle } from "lucide-react"
+import { Settings, MessageSquare, Wrench, AlertCircle, User } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -264,6 +264,62 @@ export default function MCPToolsChat() {
                               }
                             }
 
+                            // Function to render user data
+                            const renderUserData = (data: any) => {
+                              const user = data.user || data
+                              if (!user || !user.id) return null
+
+                              // Format the name - handle "Last, First" format
+                              let displayName = user.name || "Unknown User"
+                              if (displayName.includes(",")) {
+                                const [last, first] = displayName.split(",").map((s: string) => s.trim())
+                                displayName = `${first} ${last}`
+                              }
+
+                              return (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <User className="h-5 w-5 text-blue-600" />
+                                    <div>
+                                      <h4 className="font-semibold text-lg">{displayName}</h4>
+                                      <p className="text-sm text-gray-500">User ID: {user.id}</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {user.email && (
+                                      <div>
+                                        <span className="text-xs font-medium text-gray-500">Email:</span>
+                                        <p className="text-sm">{user.email}</p>
+                                      </div>
+                                    )}
+                                    {user.time_zone && (
+                                      <div>
+                                        <span className="text-xs font-medium text-gray-500">Time Zone:</span>
+                                        <p className="text-sm">{user.time_zone}</p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {user.created_at && (
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Created:</span>
+                                      <p className="text-sm">{new Date(user.created_at).toLocaleString()}</p>
+                                    </div>
+                                  )}
+
+                                  {user.role && (
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Role:</span>
+                                      <Badge variant="secondary" className="text-xs ml-2">
+                                        {user.role}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            }
+
                             // Function to render Zendesk ticket data
                             const renderZendeskTicket = (data: any) => {
                               const ticket = data.ticket || data
@@ -347,7 +403,12 @@ export default function MCPToolsChat() {
                             }
 
                             // Function to render generic structured data
-                            const renderStructuredData = (data: any) => {
+                            const renderStructuredData = (data: any, toolName: string) => {
+                              // Check if it's user data (for get_user tool)
+                              if (toolName === "get_user" || data.user || (data.id && data.name && data.email)) {
+                                return renderUserData(data)
+                              }
+
                               // Check if it's a Zendesk ticket
                               if (data.ticket || (data.id && data.subject && data.status)) {
                                 return renderZendeskTicket(data)
@@ -389,7 +450,7 @@ export default function MCPToolsChat() {
                                 </div>
                                 <div className="p-3 bg-blue-50 rounded-md border-l-2 border-blue-200">
                                   {isStructuredData && structuredData ? (
-                                    renderStructuredData(structuredData)
+                                    renderStructuredData(structuredData, tool.toolName)
                                   ) : (
                                     <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
                                   )}
@@ -445,6 +506,15 @@ export default function MCPToolsChat() {
                 <li>• "Hello, how are you?"</li>
                 <li>• "What can you help me with?"</li>
                 <li>• "Tell me a joke"</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">With Custom Server</h4>
+              <p className="text-sm text-gray-600 mb-2">If you have your custom server running, try:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• "Who is user '26623239142557'?" (get_user tool)</li>
+                <li>• "Show me ticket 13237" (get_ticket tool)</li>
+                <li>• "Get user information for ID 123456"</li>
               </ul>
             </div>
             <div>
