@@ -10,7 +10,20 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Settings, MessageSquare, Wrench, AlertCircle, User, Ticket, RefreshCw, Clock, Mail } from "lucide-react"
+import {
+  Settings,
+  MessageSquare,
+  Wrench,
+  AlertCircle,
+  User,
+  Ticket,
+  RefreshCw,
+  Clock,
+  Mail,
+  Search,
+  CheckCircle,
+  XCircle,
+} from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -42,6 +55,13 @@ interface ZendeskUser {
   role?: string
 }
 
+interface ConnectionStatus {
+  testing: boolean
+  success: boolean | null
+  error: string | null
+  user?: any
+}
+
 export default function MCPToolsChat() {
   const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
@@ -53,6 +73,13 @@ export default function MCPToolsChat() {
   const [loadingTickets, setLoadingTickets] = useState(false)
   const [loadingUser, setLoadingUser] = useState(false)
   const [ticketsError, setTicketsError] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    testing: false,
+    success: null,
+    error: null,
+  })
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isMocked, setIsMocked] = useState(false)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
@@ -70,16 +97,47 @@ export default function MCPToolsChat() {
     fetchTickets()
   }, [])
 
+  const testZendeskConnection = async () => {
+    setConnectionStatus({ testing: true, success: null, error: null })
+
+    try {
+      const response = await fetch("/api/zendesk/test")
+      const data = await response.json()
+
+      if (data.success) {
+        setConnectionStatus({
+          testing: false,
+          success: true,
+          error: null,
+          user: data.user,
+        })
+      } else {
+        setConnectionStatus({
+          testing: false,
+          success: false,
+          error: data.error || "Connection failed",
+        })
+      }
+    } catch (error: any) {
+      setConnectionStatus({
+        testing: false,
+        success: false,
+        error: error.message || "Connection test failed",
+      })
+    }
+  }
+
   const fetchTickets = async () => {
     setLoadingTickets(true)
     setTicketsError(null)
     try {
-      const response = await fetch("/api/tickets")
+      const response = await fetch("/api/tickets?per_page=50")
       if (!response.ok) {
         throw new Error("Failed to fetch tickets")
       }
       const data = await response.json()
       setTickets(data.tickets || [])
+      setIsMocked(data.mocked || false)
     } catch (error) {
       console.error("Error fetching tickets:", error)
       setTicketsError(error instanceof Error ? error.message : "Failed to fetch tickets")
@@ -102,6 +160,27 @@ export default function MCPToolsChat() {
       setSelectedUser(null)
     } finally {
       setLoadingUser(false)
+    }
+  }
+
+  const searchZendesk = async () => {
+    if (!searchQuery.trim()) return
+
+    setLoadingTickets(true)
+    setTicketsError(null)
+
+    try {
+      const response = await fetch(`/api/zendesk/search?q=${encodeURIComponent(searchQuery)}&type=ticket`)
+      if (!response.ok) {
+        throw new Error("Search failed")
+      }
+      const data = await response.json()
+      setTickets(data.results || [])
+    } catch (error) {
+      console.error("Error searching:", error)
+      setTicketsError(error instanceof Error ? error.message : "Search failed")
+    } finally {
+      setLoadingTickets(false)
     }
   }
 
@@ -151,6 +230,45 @@ export default function MCPToolsChat() {
             MCP Tools Chat & Zendesk Dashboard
           </h1>
           <p className="text-gray-600">Chat with AI using MCP tools and manage Zendesk tickets</p>
+
+          {/* Connection Status */}
+          <div className="mt-4 flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={testZendeskConnection} disabled={connectionStatus.testing}>
+              {connectionStatus.testing ? (
+                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Test Zendesk Connection
+            </Button>
+
+            {connectionStatus.success === true && (
+              <Badge variant="default" className="bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Connected as {connectionStatus.user?.name}
+              </Badge>
+            )}
+
+            {connectionStatus.success === false && (
+              <Badge variant="destructive">
+                <XCircle className="h-3 w-3 mr-1" />
+                Connection Failed
+              </Badge>
+            )}
+
+            {isMocked && (
+              <Badge variant="secondary">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Using Mock Data
+              </Badge>
+            )}
+          </div>
+
+          {connectionStatus.error && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{connectionStatus.error}</p>
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="tickets" className="space-y-6">
@@ -177,6 +295,20 @@ export default function MCPToolsChat() {
                     </CardTitle>
                     <Button variant="outline" size="sm" onClick={fetchTickets} disabled={loadingTickets}>
                       <RefreshCw className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
+                    </Button>
+                  </div>
+
+                  {/* Search */}
+                  <div className="flex gap-2 mt-4">
+                    <Input
+                      placeholder="Search tickets..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchZendesk()}
+                      className="flex-1"
+                    />
+                    <Button variant="outline" size="sm" onClick={searchZendesk}>
+                      <Search className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
@@ -294,6 +426,7 @@ export default function MCPToolsChat() {
                             >
                               {selectedTicket.status}
                             </Badge>
+                            {selectedTicket.priority && <Badge variant="outline">{selectedTicket.priority}</Badge>}
                           </div>
                         </div>
 
@@ -607,7 +740,7 @@ export default function MCPToolsChat() {
                 To use the Zendesk integration, add these to your .env.local file:
               </p>
               <div className="bg-yellow-100 p-2 rounded text-xs font-mono text-yellow-800">
-                ZENDESK_DOMAIN=your-domain.zendesk.com
+                ZENDESK_SUBDOMAIN=your-subdomain
                 <br />
                 ZENDESK_EMAIL=your-email@company.com
                 <br />
@@ -618,16 +751,19 @@ export default function MCPToolsChat() {
               <h4 className="font-semibold mb-2">Features</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>
-                  • <strong>Zendesk Tickets:</strong> View and manage recent tickets with user information
+                  • <strong>Connection Testing:</strong> Test your Zendesk credentials before using the app
+                </li>
+                <li>
+                  • <strong>Ticket Search:</strong> Search through tickets using Zendesk's search API
+                </li>
+                <li>
+                  • <strong>Enhanced Error Handling:</strong> Better error messages and fallback to mock data
+                </li>
+                <li>
+                  • <strong>Improved Client:</strong> Robust Zendesk client with proper authentication
                 </li>
                 <li>
                   • <strong>MCP Chat:</strong> Use Model Context Protocol tools for advanced interactions
-                </li>
-                <li>
-                  • <strong>Real-time Updates:</strong> Refresh tickets to see the latest information
-                </li>
-                <li>
-                  • <strong>User Details:</strong> Click any ticket to see submitter information
                 </li>
               </ul>
             </div>

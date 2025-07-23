@@ -1,62 +1,74 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { zendeskClient } from "@/lib/zendesk-client"
 
 /**
  * GET /api/tickets
  *
- *  – If Zendesk credentials exist → fetch real tickets
- *  – Otherwise → return a mocked ticket array so the UI still works
+ * Fetch tickets from Zendesk using the improved client
  */
-export async function GET(_req: NextRequest) {
-  const { ZENDESK_DOMAIN, ZENDESK_EMAIL, ZENDESK_API_TOKEN } = process.env
+export async function GET(req: NextRequest) {
+  try {
+    // Get query parameters for filtering/sorting
+    const { searchParams } = new URL(req.url)
+    const sortBy = searchParams.get("sort_by") || "created_at"
+    const sortOrder = searchParams.get("sort_order") || "desc"
+    const status = searchParams.get("status")
+    const limit = searchParams.get("per_page") || "25"
 
-  // When all env-vars are present → fetch real data
-  if (ZENDESK_DOMAIN && ZENDESK_EMAIL && ZENDESK_API_TOKEN) {
-    try {
-      const authHeader = `Basic ${Buffer.from(`${ZENDESK_EMAIL}/token:${ZENDESK_API_TOKEN}`).toString("base64")}`
-
-      const zendeskRes = await fetch(
-        `https://${ZENDESK_DOMAIN}/api/v2/tickets.json?sort_by=created_at&sort_order=desc`,
-        {
-          headers: {
-            Authorization: authHeader,
-            "Content-Type": "application/json",
-          },
-          // 20 s timeout so the UI doesn’t hang forever
-          cache: "no-store",
-          next: { revalidate: 0 },
-        },
-      )
-
-      if (!zendeskRes.ok) {
-        const errText = await zendeskRes.text()
-        throw new Error(`Zendesk responded ${zendeskRes.status}: ${errText}`)
-      }
-
-      const data = await zendeskRes.json()
-      return NextResponse.json({ tickets: data.tickets ?? [] })
-    } catch (err) {
-      console.error("Zendesk API error:", err)
-      // fall through to mocked payload below
+    const params: any = {
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      per_page: limit,
     }
-  }
 
-  /* ------------------------------------------------------------------
-     Fallback: return a very small mock payload so the UI can render.
-     This prevents 500s in local/preview environments without creds.
-  ------------------------------------------------------------------ */
-  const mockNow = new Date().toISOString()
-  return NextResponse.json({
-    mocked: true,
-    tickets: [
-      {
-        id: 99999,
-        subject: "Mock - Example bug report",
-        description: "This is a mocked ticket because Zendesk creds are missing.",
-        status: "open",
-        created_at: mockNow,
-        updated_at: mockNow,
-        submitter_id: 123456789,
-      },
-    ],
-  })
+    if (status) {
+      params.status = status
+    }
+
+    const data = await zendeskClient.listTickets(params)
+    return NextResponse.json({
+      tickets: data.tickets || [],
+      count: data.count,
+      next_page: data.next_page,
+      previous_page: data.previous_page,
+    })
+  } catch (error: any) {
+    console.error("Error fetching tickets:", error)
+
+    // Check if it's a credentials issue
+    if (error.message.includes("credentials not configured")) {
+      // Return mock data for development
+      const mockNow = new Date().toISOString()
+      return NextResponse.json({
+        mocked: true,
+        tickets: [
+          {
+            id: 99999,
+            subject: "Mock - Example bug report",
+            description: "This is a mocked ticket because Zendesk credentials are missing.",
+            status: "open",
+            created_at: mockNow,
+            updated_at: mockNow,
+            submitter_id: 123456789,
+            priority: "normal",
+            type: "incident",
+          },
+          {
+            id: 99998,
+            subject: "Mock - Feature request",
+            description: "This is another mocked ticket for testing the UI.",
+            status: "pending",
+            created_at: mockNow,
+            updated_at: mockNow,
+            submitter_id: 123456790,
+            priority: "low",
+            type: "task",
+          },
+        ],
+        count: 2,
+      })
+    }
+
+    return NextResponse.json({ error: "Failed to fetch tickets", details: error.message }, { status: 500 })
+  }
 }
