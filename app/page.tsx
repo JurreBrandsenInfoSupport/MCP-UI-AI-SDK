@@ -8,8 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Settings, MessageSquare, Wrench } from "lucide-react"
-import { MCPServerInstructions } from "@/components/mcp-server-instructions"
+import { Settings, MessageSquare, Wrench, AlertCircle } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -20,14 +19,19 @@ interface MCPConfig {
 
 export default function MCPToolsChat() {
   const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
-  const [showConfig, setShowConfig] = useState(false)
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
   const [stdioCommand, setStdioCommand] = useState("node")
-  const [stdioArgs, setStdioArgs] = useState("server.js")
+  const [stdioArgs, setStdioArgs] = useState("scripts/echo-mcp-server.js")
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     body: { mcpConfig },
+    onError: (error) => {
+      console.error("Chat error:", error)
+    },
+    onFinish: (message) => {
+      console.log("Message finished:", message)
+    },
   })
 
   const updateMcpConfig = () => {
@@ -41,7 +45,7 @@ export default function MCPToolsChat() {
     }
 
     setMcpConfig(config)
-    setShowConfig(false)
+    console.log("Updated MCP config:", config)
   }
 
   return (
@@ -111,7 +115,7 @@ export default function MCPToolsChat() {
                       id="stdio-args"
                       value={stdioArgs}
                       onChange={(e) => setStdioArgs(e.target.value)}
-                      placeholder="server.js"
+                      placeholder="scripts/echo-mcp-server.js"
                     />
                   </div>
                 </div>
@@ -141,17 +145,37 @@ export default function MCPToolsChat() {
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
                 Chat
+                {error && (
+                  <Badge variant="destructive" className="ml-auto">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Error
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[500px] overflow-y-auto space-y-4 mb-4 p-4 bg-gray-50 rounded-lg">
-                {messages.length === 0 && (
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-red-800">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="font-medium">Error</span>
+                    </div>
+                    <p className="text-red-700 text-sm mt-1">{error.message}</p>
+                  </div>
+                )}
+
+                {messages.length === 0 && !error && (
                   <div className="text-center text-gray-500 py-8">
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>Start a conversation with the AI assistant</p>
                     {mcpConfig.type !== "none" && (
                       <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
                     )}
+                    <div className="mt-4 text-xs text-gray-400">
+                      <p>Try: "Hello, can you help me?"</p>
+                      {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
+                    </div>
                   </div>
                 )}
 
@@ -198,7 +222,7 @@ export default function MCPToolsChat() {
                   disabled={isLoading}
                   className="flex-1"
                 />
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || !input.trim()}>
                   Send
                 </Button>
               </form>
@@ -207,7 +231,31 @@ export default function MCPToolsChat() {
         </div>
 
         {/* Instructions */}
-        <MCPServerInstructions />
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="font-semibold mb-2">Quick Test</h4>
+              <p className="text-sm text-gray-600 mb-2">Try these simple prompts first to test the connection:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• "Hello, how are you?"</li>
+                <li>• "What can you help me with?"</li>
+                <li>• "Tell me a joke"</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">With Echo MCP Server</h4>
+              <p className="text-sm text-gray-600 mb-2">If you have the echo server running, try:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• "Can you echo the text 'Hello World'?"</li>
+                <li>• "Reverse the text 'OpenAI'"</li>
+                <li>• "Convert 'hello world' to uppercase"</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
