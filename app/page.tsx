@@ -57,6 +57,19 @@ interface ZendeskUser {
   role?: string
 }
 
+interface SimilarTicket {
+  id: number
+  subject: string
+  problem: string
+  solution: string
+  status: string
+  created_at: string
+  updated_at: string
+  resolution_time: string
+  priority?: string
+  type?: string
+}
+
 interface ConnectionStatus {
   testing: boolean
   success: boolean | null
@@ -85,7 +98,7 @@ export default function MCPToolsChat() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isMocked, setIsMocked] = useState(false)
   const [activeTab, setActiveTab] = useState("tickets")
-  const [similarTickets, setSimilarTickets] = useState<any[]>([])
+  const [similarTickets, setSimilarTickets] = useState<SimilarTicket[]>([])
   const [loadingSimilarTickets, setLoadingSimilarTickets] = useState(false)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages, setInput } = useChat({
@@ -230,14 +243,14 @@ export default function MCPToolsChat() {
     if (similarTickets.length > 0) {
       similarTicketsContext = `
 
-**Vergelijkbare Opgeloste Tickets:**
+**Vergelijkbare Gesloten Tickets (met Oplossingen):**
 
 ${similarTickets
   .map(
     (ticket, index) => `
 ${index + 1}. **Ticket #${ticket.id}: ${ticket.subject}**
    - Status: ${ticket.status}
-   - Beschrijving: ${ticket.description}
+   - Probleem: ${ticket.problem}
    - Oplossing: ${ticket.solution}
    - Opgelost in: ${ticket.resolution_time}
    - Datum: ${new Date(ticket.updated_at).toLocaleDateString()}
@@ -245,7 +258,7 @@ ${index + 1}. **Ticket #${ticket.id}: ${ticket.subject}**
   )
   .join("")}
 
-Gebruik deze vergelijkbare tickets om patronen te identificeren en mogelijke oplossingen voor te stellen.`
+Gebruik deze vergelijkbare gesloten tickets om patronen te identificeren en bewezen oplossingen voor te stellen.`
     }
 
     // Create a comprehensive ticket context message
@@ -270,7 +283,7 @@ ${selectedTicket.description}
 - Tijdzone: ${selectedUser.time_zone || "Niet gespecificeerd"}
 - Lid sinds: ${new Date(selectedUser.created_at).toLocaleDateString()}${similarTicketsContext}
 
-Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, stel mogelijke oplossingen voor gebaseerd op eerdere succesvolle oplossingen, en identificeer problemen die aandacht nodig hebben.`
+Geef inzichten over dit ticket, analyseer patronen met vergelijkbare gesloten tickets, stel mogelijke oplossingen voor gebaseerd op bewezen succesvolle oplossingen uit het verleden, en identificeer problemen die aandacht nodig hebben.`
 
     setInput(ticketContext)
     setActiveTab("chat")
@@ -593,48 +606,49 @@ Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, st
                           <p className="text-gray-500">Kon gebruikersinformatie niet laden</p>
                         )}
                       </div>
+
                       {/* Similar Tickets Section */}
                       <div className="border-t pt-6">
                         <h4 className="font-semibold mb-4 flex items-center gap-2">
                           <Search className="h-4 w-4" />
-                          Vergelijkbare Tickets
+                          Vergelijkbare Gesloten Tickets
                         </h4>
                         {loadingSimilarTickets ? (
                           <div className="flex items-center gap-2 text-gray-500">
                             <RefreshCw className="h-4 w-4 animate-spin" />
-                            Vergelijkbare tickets zoeken...
+                            Vergelijkbare gesloten tickets zoeken...
                           </div>
                         ) : similarTickets.length > 0 ? (
                           <div className="space-y-3">
                             {similarTickets.map((ticket) => (
                               <div key={ticket.id} className="bg-white border rounded-lg p-4">
-                                <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-start justify-between mb-3">
                                   <div>
                                     <h5 className="font-semibold text-sm">
                                       #{ticket.id}: {ticket.subject}
                                     </h5>
                                     <div className="flex items-center gap-2 mt-1">
-                                      <Badge
-                                        variant={ticket.status === "solved" ? "default" : "secondary"}
-                                        className="text-xs"
-                                      >
+                                      <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
                                         {ticket.status}
                                       </Badge>
-                                      {ticket.resolution_time && (
-                                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                                          <Clock className="h-3 w-3" />
-                                          {ticket.resolution_time}
-                                        </span>
-                                      )}
+                                      <span className="text-xs text-gray-500 flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        Opgelost in {ticket.resolution_time}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
 
-                                <div className="text-sm text-gray-600 mb-2">
-                                  <strong>Probleem:</strong> {ticket.description}
-                                </div>
+                                <div className="space-y-3">
+                                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <AlertCircle className="h-4 w-4 text-red-600" />
+                                      <span className="font-medium text-red-800 text-sm">Probleem</span>
+                                    </div>
+                                    <p className="text-sm text-red-700">{ticket.problem}</p>
+                                  </div>
 
-                                {ticket.solution && (
                                   <div className="bg-green-50 border border-green-200 rounded-md p-3">
                                     <div className="flex items-center gap-2 mb-1">
                                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -642,9 +656,9 @@ Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, st
                                     </div>
                                     <p className="text-sm text-green-700">{ticket.solution}</p>
                                   </div>
-                                )}
+                                </div>
 
-                                <div className="text-xs text-gray-500 mt-2">
+                                <div className="text-xs text-gray-500 mt-3 pt-2 border-t">
                                   Opgelost op: {new Date(ticket.updated_at).toLocaleDateString()}
                                 </div>
                               </div>
@@ -653,7 +667,10 @@ Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, st
                         ) : (
                           <div className="text-center py-6 text-gray-500">
                             <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm">Geen vergelijkbare tickets gevonden</p>
+                            <p className="text-sm">Geen vergelijkbare gesloten tickets gevonden</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Zoekt alleen naar gesloten tickets met vergelijkbare onderwerpen
+                            </p>
                           </div>
                         )}
                       </div>
@@ -942,6 +959,11 @@ Geef inzichten over dit ticket, analyseer patronen met vergelijkbare tickets, st
                 </li>
                 <li>
                   • <strong>Oplossing Suggesties:</strong> Krijg AI-aangedreven aanbevelingen voor ticket oplossing
+                  gebaseerd op gesloten tickets
+                </li>
+                <li>
+                  • <strong>Vergelijkbare Tickets:</strong> Automatisch zoeken naar gesloten tickets met vergelijkbare
+                  problemen en bewezen oplossingen
                 </li>
               </ul>
             </div>

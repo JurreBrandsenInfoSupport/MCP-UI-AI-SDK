@@ -1,57 +1,112 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { zendeskClient } from "@/lib/zendesk-client"
 
-// Mock similar tickets data
+// Mock similar tickets data with more realistic closed tickets
 const mockSimilarTickets = {
   14975: [
     {
       id: 14950,
       subject: "Bug - Wissel - v2025.10.15",
-      description: "Bijsturingsgeluid werkt niet na update",
-      status: "solved",
+      description: "Bijsturingsgeluid werkt niet na update. Systeem geeft geen audio feedback bij wissel operaties.",
+      status: "closed",
       priority: "normal",
       type: "incident",
       created_at: "2025-07-20T10:15:00Z",
       updated_at: "2025-07-20T15:30:00Z",
       submitter_id: 26623239142561,
       assignee_id: 12345,
-      solution:
-        "Probleem opgelost door audio driver te updaten naar versie 3.2.1. Herstart van systeem vereist na installatie.",
-      resolution_time: "5 uur 15 minuten",
+      comments: [
+        {
+          id: 1001,
+          body: "Ik heb hetzelfde probleem. Bijsturingsgeluid werkt niet meer sinds de laatste update.",
+          author_id: 26623239142561,
+          created_at: "2025-07-20T10:20:00Z",
+          public: true,
+        },
+        {
+          id: 1002,
+          body: "Probleem opgelost door audio driver te updaten naar versie 3.2.1. Herstart van systeem vereist na installatie. Stappen: 1) Download driver van fabrikant website, 2) Installeer driver, 3) Herstart systeem, 4) Test bijsturingsgeluid.",
+          author_id: 12345,
+          created_at: "2025-07-20T15:30:00Z",
+          public: true,
+        },
+      ],
     },
     {
       id: 14925,
       subject: "Vraag - Geluid problemen wissel",
-      description: "Geen geluid bij wissel operaties",
-      status: "solved",
+      description: "Geen geluid bij wissel operaties. Audio systeem lijkt niet te reageren op wissel commando's.",
+      status: "closed",
       priority: "high",
       type: "question",
       created_at: "2025-07-18T14:20:00Z",
       updated_at: "2025-07-18T16:45:00Z",
       submitter_id: 26623239142562,
       assignee_id: 12346,
-      solution:
-        "Configuratie aangepast in wissel control panel. Audio output instellingen waren incorrect geconfigureerd. Stappen: 1) Open control panel, 2) Ga naar Audio Settings, 3) Selecteer correct output device, 4) Test audio.",
-      resolution_time: "2 uur 25 minuten",
+      comments: [
+        {
+          id: 1003,
+          body: "Gebruiker meldt geen geluid bij wissel operaties. Probleem lijkt software gerelateerd.",
+          author_id: 12346,
+          created_at: "2025-07-18T14:25:00Z",
+          public: true,
+        },
+        {
+          id: 1004,
+          body: "Configuratie aangepast in wissel control panel. Audio output instellingen waren incorrect geconfigureerd. Oplossing: 1) Open control panel, 2) Ga naar Audio Settings, 3) Selecteer correct output device (meestal 'Primary Sound Driver'), 4) Test audio functionaliteit. Probleem opgelost.",
+          author_id: 12346,
+          created_at: "2025-07-18T16:45:00Z",
+          public: true,
+        },
+      ],
     },
   ],
   14974: [
     {
       id: 14960,
       subject: "Vraag - Kan niet inloggen",
-      description: "Login scherm accepteert wachtwoord niet",
-      status: "solved",
+      description: "Login scherm accepteert wachtwoord niet. Gebruiker krijgt foutmelding bij inlogpoging.",
+      status: "closed",
       priority: "high",
       type: "question",
       created_at: "2025-07-21T09:30:00Z",
       updated_at: "2025-07-21T10:15:00Z",
       submitter_id: 26623239142563,
       assignee_id: 12345,
-      solution:
-        "Wachtwoord reset uitgevoerd. Gebruiker had caps lock aan staan. Nieuwe tijdelijke wachtwoord verstuurd via email.",
-      resolution_time: "45 minuten",
+      comments: [
+        {
+          id: 1005,
+          body: "Gebruiker kan niet inloggen, wachtwoord wordt niet geaccepteerd.",
+          author_id: 12345,
+          created_at: "2025-07-21T09:35:00Z",
+          public: true,
+        },
+        {
+          id: 1006,
+          body: "Wachtwoord reset uitgevoerd. Gebruiker had caps lock aan staan tijdens inlogpoging. Nieuwe tijdelijke wachtwoord verstuurd via email. Gebruiker kan nu succesvol inloggen. Advies gegeven om caps lock status te controleren bij toekomstige inlogproblemen.",
+          author_id: 12345,
+          created_at: "2025-07-21T10:15:00Z",
+          public: true,
+        },
+      ],
     },
   ],
+}
+
+async function fetchTicketComments(ticketId: number) {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/tickets/${ticketId}/comments`,
+    )
+    if (!response.ok) {
+      throw new Error("Failed to fetch comments")
+    }
+    const data = await response.json()
+    return data.comments || []
+  } catch (error) {
+    console.error(`Failed to fetch comments for ticket ${ticketId}:`, error)
+    return []
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -66,10 +121,10 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      // Try to search for similar tickets in Zendesk
+      // Try to search for similar CLOSED tickets in Zendesk
       let searchQuery = ""
       if (subject) {
-        // Extract key terms from subject for search
+        // Extract key terms from subject for search, focusing on closed tickets
         const keyTerms = subject
           .toLowerCase()
           .split(/[\s\-_]+/)
@@ -77,7 +132,8 @@ export async function GET(request: NextRequest) {
           .slice(0, 3)
           .join(" ")
 
-        searchQuery = `type:ticket status<solved ${keyTerms}`
+        // Only search for closed tickets
+        searchQuery = `type:ticket status:closed ${keyTerms}`
       }
 
       if (searchQuery) {
@@ -88,17 +144,38 @@ export async function GET(request: NextRequest) {
         })
 
         // Filter out the current ticket and limit results
-        const similarTickets = (response.results || [])
-          .filter((ticket: any) => ticket.id !== Number.parseInt(ticketId))
+        const filteredTickets = (response.results || [])
+          .filter((ticket: any) => ticket.id !== Number.parseInt(ticketId) && ticket.status === "closed")
           .slice(0, 5)
-          .map((ticket: any) => ({
-            ...ticket,
-            solution: ticket.description || "Geen oplossing beschikbaar",
-            resolution_time: "Onbekend",
-          }))
+
+        // Fetch comments for each similar ticket
+        const similarTicketsWithComments = await Promise.all(
+          filteredTickets.map(async (ticket: any) => {
+            const comments = await fetchTicketComments(ticket.id)
+
+            // Get the last comment as the solution
+            const lastComment = comments.length > 0 ? comments[comments.length - 1] : null
+            const solution = lastComment ? lastComment.body : "Geen oplossing beschikbaar"
+
+            // Calculate resolution time
+            const createdTime = new Date(ticket.created_at).getTime()
+            const updatedTime = new Date(ticket.updated_at).getTime()
+            const diffHours = Math.round((updatedTime - createdTime) / (1000 * 60 * 60))
+            const resolutionTime =
+              diffHours > 24 ? `${Math.round(diffHours / 24)} dagen` : `${diffHours} uur${diffHours !== 1 ? "" : ""}`
+
+            return {
+              ...ticket,
+              problem: ticket.description || "Geen probleem beschrijving beschikbaar",
+              solution,
+              resolution_time: resolutionTime,
+              comments,
+            }
+          }),
+        )
 
         return NextResponse.json({
-          similarTickets,
+          similarTickets: similarTicketsWithComments,
           mocked: false,
         })
       } else {
@@ -110,8 +187,30 @@ export async function GET(request: NextRequest) {
       // Return mock data when search fails
       const mockTickets = mockSimilarTickets[Number.parseInt(ticketId) as keyof typeof mockSimilarTickets] || []
 
+      // Process mock tickets to extract solution from last comment
+      const processedMockTickets = mockTickets.map((ticket: any) => {
+        const lastComment =
+          ticket.comments && ticket.comments.length > 0 ? ticket.comments[ticket.comments.length - 1] : null
+
+        const solution = lastComment ? lastComment.body : "Geen oplossing beschikbaar"
+
+        // Calculate resolution time for mock data
+        const createdTime = new Date(ticket.created_at).getTime()
+        const updatedTime = new Date(ticket.updated_at).getTime()
+        const diffHours = Math.round((updatedTime - createdTime) / (1000 * 60 * 60))
+        const resolutionTime =
+          diffHours > 24 ? `${Math.round(diffHours / 24)} dagen` : `${diffHours} uur${diffHours !== 1 ? "" : ""}`
+
+        return {
+          ...ticket,
+          problem: ticket.description,
+          solution,
+          resolution_time: resolutionTime,
+        }
+      })
+
       return NextResponse.json({
-        similarTickets: mockTickets,
+        similarTickets: processedMockTickets,
         mocked: true,
       })
     }
