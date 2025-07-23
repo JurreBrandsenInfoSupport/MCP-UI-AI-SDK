@@ -51,6 +51,15 @@ const mockComments = {
       public: true,
     },
   ],
+  14975: [
+    {
+      id: 1007,
+      body: "Bijsturingsgeluid werkt niet. Gebruiker meldt geen audio feedback bij wissel operaties.",
+      author_id: 26623239142561,
+      created_at: "2025-07-23T14:05:00Z",
+      public: true,
+    },
+  ],
 }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -62,8 +71,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     try {
-      // Try to fetch comments from Zendesk
-      const response = await zendeskClient.tickets.getComments(Number.parseInt(ticketId))
+      // Try to fetch comments from Zendesk using the correct method
+      const response = await zendeskClient.getTicketComments(Number.parseInt(ticketId))
 
       return NextResponse.json({
         comments: response.comments || [],

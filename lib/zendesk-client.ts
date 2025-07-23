@@ -83,6 +83,11 @@ class ZendeskClient {
     return this.request("DELETE", `/tickets/${id}.json`)
   }
 
+  // Ticket Comments
+  async getTicketComments(ticketId, params = {}) {
+    return this.request("GET", `/tickets/${ticketId}/comments.json`, null, params)
+  }
+
   // Users
   async listUsers(params) {
     return this.request("GET", "/users.json", null, params)
