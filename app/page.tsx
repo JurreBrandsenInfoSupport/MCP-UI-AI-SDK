@@ -193,32 +193,186 @@ export default function MCPToolsChat() {
                           {message.toolInvocations.map((tool, index) => {
                             // Extract content from tool result
                             let displayContent = "No result"
+                            let isStructuredData = false
+                            let structuredData = null
 
                             if (tool.result) {
                               try {
                                 // Handle different result formats
                                 if (typeof tool.result === "string") {
-                                  displayContent = tool.result
+                                  // Try to parse as JSON first
+                                  try {
+                                    const parsed = JSON.parse(tool.result)
+                                    if (parsed && typeof parsed === "object") {
+                                      structuredData = parsed
+                                      isStructuredData = true
+                                    } else {
+                                      displayContent = tool.result
+                                    }
+                                  } catch {
+                                    displayContent = tool.result
+                                  }
                                 } else if (tool.result.content) {
                                   // Handle MCP format with content array
                                   if (Array.isArray(tool.result.content)) {
-                                    displayContent = tool.result.content
+                                    const contentText = tool.result.content
                                       .map((item: any) => item.text || item.content || JSON.stringify(item))
                                       .join(" ")
+
+                                    // Try to parse content as JSON
+                                    try {
+                                      const parsed = JSON.parse(contentText)
+                                      if (parsed && typeof parsed === "object") {
+                                        structuredData = parsed
+                                        isStructuredData = true
+                                      } else {
+                                        displayContent = contentText
+                                      }
+                                    } catch {
+                                      displayContent = contentText
+                                    }
                                   } else if (typeof tool.result.content === "string") {
-                                    displayContent = tool.result.content
+                                    try {
+                                      const parsed = JSON.parse(tool.result.content)
+                                      if (parsed && typeof parsed === "object") {
+                                        structuredData = parsed
+                                        isStructuredData = true
+                                      } else {
+                                        displayContent = tool.result.content
+                                      }
+                                    } catch {
+                                      displayContent = tool.result.content
+                                    }
                                   } else {
                                     displayContent = JSON.stringify(tool.result.content)
                                   }
                                 } else if (tool.result.text) {
                                   displayContent = tool.result.text
+                                } else if (tool.result.error) {
+                                  displayContent = `Error: ${tool.result.error}`
                                 } else {
-                                  // Fallback for other formats
-                                  displayContent = JSON.stringify(tool.result)
+                                  // Try to parse the entire result as structured data
+                                  if (typeof tool.result === "object") {
+                                    structuredData = tool.result
+                                    isStructuredData = true
+                                  } else {
+                                    displayContent = JSON.stringify(tool.result)
+                                  }
                                 }
                               } catch (e) {
-                                displayContent = String(tool.result)
+                                displayContent = `Error parsing result: ${String(tool.result)}`
                               }
+                            }
+
+                            // Function to render Zendesk ticket data
+                            const renderZendeskTicket = (data: any) => {
+                              const ticket = data.ticket || data
+                              if (!ticket || !ticket.id) return null
+
+                              // Extract subject type (vraag, bug, compliment, klacht)
+                              const subject = ticket.subject || ticket.raw_subject || ""
+                              const subjectType = subject.toLowerCase().includes("bug")
+                                ? "bug"
+                                : subject.toLowerCase().includes("vraag")
+                                  ? "vraag"
+                                  : subject.toLowerCase().includes("compliment")
+                                    ? "compliment"
+                                    : subject.toLowerCase().includes("klacht")
+                                      ? "klacht"
+                                      : "unknown"
+
+                              return (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Ticket ID:</span>
+                                      <p className="text-sm font-mono">{ticket.id}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Created:</span>
+                                      <p className="text-sm">{new Date(ticket.created_at).toLocaleString()}</p>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Subject:</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <p className="text-sm">{subject}</p>
+                                      <Badge
+                                        variant={
+                                          subjectType === "bug"
+                                            ? "destructive"
+                                            : subjectType === "compliment"
+                                              ? "default"
+                                              : "secondary"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {subjectType}
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Status:</span>
+                                    <div className="mt-1">
+                                      <Badge
+                                        variant={
+                                          ticket.status === "open"
+                                            ? "destructive"
+                                            : ticket.status === "closed"
+                                              ? "default"
+                                              : "secondary"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {ticket.status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">User (Submitter):</span>
+                                    <p className="text-sm font-mono">{ticket.submitter_id}</p>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Description:</span>
+                                    <p className="text-sm mt-1 p-2 bg-gray-50 rounded border-l-2 border-gray-300">
+                                      {ticket.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              )
+                            }
+
+                            // Function to render generic structured data
+                            const renderStructuredData = (data: any) => {
+                              // Check if it's a Zendesk ticket
+                              if (data.ticket || (data.id && data.subject && data.status)) {
+                                return renderZendeskTicket(data)
+                              }
+
+                              // Generic object renderer
+                              return (
+                                <div className="space-y-2">
+                                  {Object.entries(data)
+                                    .slice(0, 10)
+                                    .map(([key, value]) => (
+                                      <div key={key} className="grid grid-cols-3 gap-2">
+                                        <span className="text-xs font-medium text-gray-500 truncate">{key}:</span>
+                                        <span className="text-sm col-span-2 break-words">
+                                          {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  {Object.keys(data).length > 10 && (
+                                    <p className="text-xs text-gray-400">
+                                      ... and {Object.keys(data).length - 10} more fields
+                                    </p>
+                                  )}
+                                </div>
+                              )
                             }
 
                             return (
@@ -227,9 +381,18 @@ export default function MCPToolsChat() {
                                   <Badge variant="outline" className="text-xs">
                                     {tool.toolName}
                                   </Badge>
+                                  {isStructuredData && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Structured Data
+                                    </Badge>
+                                  )}
                                 </div>
-                                <div className="p-2 bg-blue-50 rounded-md border-l-2 border-blue-200">
-                                  <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                <div className="p-3 bg-blue-50 rounded-md border-l-2 border-blue-200">
+                                  {isStructuredData && structuredData ? (
+                                    renderStructuredData(structuredData)
+                                  ) : (
+                                    <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                  )}
                                 </div>
                               </div>
                             )
