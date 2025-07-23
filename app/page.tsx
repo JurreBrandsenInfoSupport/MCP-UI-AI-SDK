@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Settings, MessageSquare, Wrench, AlertCircle } from "lucide-react"
+import { Settings, MessageSquare, Wrench, AlertCircle, ArrowRight } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -46,6 +46,41 @@ export default function MCPToolsChat() {
 
     setMcpConfig(config)
     console.log("Updated MCP config:", config)
+  }
+
+  // Quick action buttons for common chained operations
+  const quickActions = [
+    {
+      label: "Chain: Echo → Reverse → Uppercase",
+      prompt:
+        "Please chain these operations step by step: 1) First echo 'hello world', 2) Then reverse the result from step 1, 3) Then uppercase the result from step 2. Use the output from each step as input to the next step.",
+    },
+    {
+      label: "Chain: Generate → Count → Echo",
+      prompt:
+        "Please chain these operations: 1) Generate a greeting message, 2) Count the words in that generated message, 3) Echo back the word count result. Pass the output from each step to the next.",
+    },
+    {
+      label: "Chain: Reverse → Echo → Uppercase",
+      prompt:
+        "Chain these tools step by step: 1) Reverse the text 'AI SDK', 2) Echo the reversed result, 3) Convert the echoed result to uppercase. Each step should use the output from the previous step.",
+    },
+  ]
+
+  const handleQuickAction = (prompt: string) => {
+    // Set the input and trigger form submission
+    const event = new Event("submit", { bubbles: true, cancelable: true })
+    const form = document.querySelector("form")
+    if (form) {
+      const inputElement = form.querySelector('input[type="text"]') as HTMLInputElement
+      if (inputElement) {
+        inputElement.value = prompt
+        handleInputChange({ target: { value: prompt } } as any)
+        setTimeout(() => {
+          form.dispatchEvent(event)
+        }, 100)
+      }
+    }
   }
 
   return (
@@ -136,6 +171,30 @@ export default function MCPToolsChat() {
                   <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
                 )}
               </div>
+
+              {/* Quick Actions */}
+              {mcpConfig.type !== "none" && (
+                <div className="pt-2 border-t">
+                  <Label className="text-xs font-medium mb-2 block">Quick Tool Chains:</Label>
+                  <div className="space-y-2">
+                    {quickActions.map((action, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs h-auto py-2 px-2 bg-transparent"
+                        onClick={() => handleQuickAction(action.prompt)}
+                        disabled={isLoading}
+                      >
+                        <div className="flex items-center gap-1">
+                          <ArrowRight className="h-3 w-3" />
+                          <span className="text-left">{action.label}</span>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -170,11 +229,20 @@ export default function MCPToolsChat() {
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>Start a conversation with the AI assistant</p>
                     {mcpConfig.type !== "none" && (
-                      <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
+                      <div className="mt-4">
+                        <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
+                        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-medium text-blue-800 mb-2">💡 Tool Chaining Tip:</p>
+                          <p className="text-xs text-blue-700">
+                            To chain tools together, be explicit: "First do X, then use that result for Y, then use that
+                            result for Z"
+                          </p>
+                        </div>
+                      </div>
                     )}
                     <div className="mt-4 text-xs text-gray-400">
-                      <p>Try: "Hello, can you help me?"</p>
-                      {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
+                      <p>Try the quick actions on the left, or ask:</p>
+                      <p>"Chain: echo 'hello' → reverse result → uppercase result"</p>
                     </div>
                   </div>
                 )}
@@ -189,7 +257,21 @@ export default function MCPToolsChat() {
                       <div className="whitespace-pre-wrap">{message.content}</div>
                       {message.toolInvocations && message.toolInvocations.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500 mb-2">Tools used ({message.toolInvocations.length}):</p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-xs text-gray-500">
+                              Tool Chain ({message.toolInvocations.length} steps):
+                            </p>
+                            <div className="flex items-center gap-1">
+                              {message.toolInvocations.map((_, index) => (
+                                <div key={index} className="flex items-center">
+                                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                  {index < message.toolInvocations.length - 1 && (
+                                    <ArrowRight className="h-3 w-3 text-gray-400 mx-1" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                           <div className="space-y-2">
                             {message.toolInvocations.map((tool, index) => {
                               // Extract content from tool result
@@ -230,13 +312,22 @@ export default function MCPToolsChat() {
                               }
 
                               return (
-                                <div key={index} className="border rounded-md p-2 bg-gray-50">
+                                <div key={index} className="border rounded-md p-2 bg-gray-50 relative">
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="text-xs">
-                                        {tool.toolName}
-                                      </Badge>
-                                      <span className="text-xs text-gray-400">#{index + 1}</span>
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                          {index + 1}
+                                        </div>
+                                        <Badge variant="outline" className="text-xs">
+                                          {tool.toolName}
+                                        </Badge>
+                                      </div>
+                                      {index > 0 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          Uses output from step {index}
+                                        </Badge>
+                                      )}
                                     </div>
                                     {tool.args && (
                                       <Badge variant="secondary" className="text-xs">
@@ -265,6 +356,13 @@ export default function MCPToolsChat() {
                                   >
                                     <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
                                   </div>
+
+                                  {/* Arrow to next step */}
+                                  {index < message.toolInvocations.length - 1 && (
+                                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-white border rounded-full p-1">
+                                      <ArrowRight className="h-3 w-3 text-blue-500" />
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -307,36 +405,35 @@ export default function MCPToolsChat() {
         {/* Instructions */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
+            <CardTitle className="text-lg">How to Chain MCP Tools</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-semibold mb-2 text-yellow-800">🔗 Tool Chaining</h4>
+              <p className="text-sm text-yellow-700 mb-2">
+                To chain tools together (where output of one becomes input of the next), be very explicit in your
+                request:
+              </p>
+              <div className="bg-yellow-100 p-2 rounded text-xs font-mono text-yellow-800">
+                "Please do this step by step: 1) First echo 'hello world', 2) Then reverse the result from step 1, 3)
+                Then uppercase the result from step 2"
+              </div>
+            </div>
             <div>
-              <h4 className="font-semibold mb-2">Quick Test</h4>
-              <p className="text-sm text-gray-600 mb-2">Try these simple prompts first to test the connection:</p>
+              <h4 className="font-semibold mb-2">✅ Good Chaining Examples</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Hello, how are you?"</li>
-                <li>• "What can you help me with?"</li>
-                <li>• "Tell me a joke"</li>
+                <li>• "Chain: echo 'test' → reverse the echoed result → uppercase the reversed result"</li>
+                <li>• "Step 1: Generate a greeting. Step 2: Count words in that greeting. Step 3: Echo the count."</li>
+                <li>
+                  • "Process 'hello' by first echoing it, then pass that result to reverse, then pass that to uppercase"
+                </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-2">With Echo MCP Server</h4>
-              <p className="text-sm text-gray-600 mb-2">If you have the echo server running, try:</p>
+              <h4 className="font-semibold mb-2">❌ What Doesn't Work</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Can you echo the text 'Hello World'?"</li>
-                <li>• "Reverse the text 'OpenAI'"</li>
-                <li>• "Convert 'hello world' to uppercase"</li>
-                <li>• "Echo 'Hello', then reverse 'World', and count words in 'AI is amazing'"</li>
-                <li>• "Generate a formal greeting and then echo it back to me"</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">Multiple Tool Usage</h4>
-              <p className="text-sm text-gray-600 mb-2">The AI can use multiple tools in a single response:</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Process 'hello world' by echoing it, reversing it, and making it uppercase"</li>
-                <li>• "Generate a greeting, then count the words in it"</li>
-                <li>• "Echo 'AI', reverse 'SDK', and uppercase 'mcp tools'"</li>
+                <li>• "Echo, reverse, and uppercase 'hello world'" (all tools get same input)</li>
+                <li>• "Use multiple tools on this text" (unclear chaining)</li>
               </ul>
             </div>
           </CardContent>
