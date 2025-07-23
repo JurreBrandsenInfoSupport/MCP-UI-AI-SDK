@@ -191,9 +191,17 @@ export default function MCPToolsChat() {
                         <div className="mt-2 pt-2 border-t border-gray-200">
                           <p className="text-xs text-gray-500 mb-1">Tools used:</p>
                           {message.toolInvocations.map((tool, index) => (
-                            <Badge key={index} variant="outline" className="mr-1 mb-1">
-                              {tool.toolName}
-                            </Badge>
+                            <div key={index} className="mb-2">
+                              <Badge variant="outline" className="mr-2 mb-1">
+                                {tool.toolName}
+                              </Badge>
+                              {tool.result && (
+                                <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                  <span className="text-xs text-gray-500">Result: </span>
+                                  <span className="font-mono">{JSON.stringify(tool.result)}</span>
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
