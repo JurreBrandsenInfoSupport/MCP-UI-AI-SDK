@@ -8,20 +8,23 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Settings, MessageSquare, Wrench, AlertCircle, ArrowRight } from "lucide-react"
+import { Toggle } from "@/components/ui/toggle"
+import { Settings, MessageSquare, Wrench, AlertCircle, Shield, ShieldCheck } from "lucide-react"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
   url?: string
   command?: string
   args?: string[]
+  autoApproveTools?: boolean
 }
 
 export default function MCPToolsChat() {
-  const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
+  const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none", autoApproveTools: false })
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
   const [stdioCommand, setStdioCommand] = useState("node")
   const [stdioArgs, setStdioArgs] = useState("scripts/echo-mcp-server.js")
+  const [autoApproveTools, setAutoApproveTools] = useState(false)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
@@ -35,7 +38,10 @@ export default function MCPToolsChat() {
   })
 
   const updateMcpConfig = () => {
-    const config: MCPConfig = { type: mcpConfig.type }
+    const config: MCPConfig = {
+      type: mcpConfig.type,
+      autoApproveTools: autoApproveTools,
+    }
 
     if (mcpConfig.type === "sse") {
       config.url = sseUrl
@@ -46,41 +52,6 @@ export default function MCPToolsChat() {
 
     setMcpConfig(config)
     console.log("Updated MCP config:", config)
-  }
-
-  // Quick action buttons for common chained operations
-  const quickActions = [
-    {
-      label: "Chain: Echo → Reverse → Uppercase",
-      prompt:
-        "Please chain these operations step by step: 1) First echo 'hello world', 2) Then reverse the result from step 1, 3) Then uppercase the result from step 2. Use the output from each step as input to the next step.",
-    },
-    {
-      label: "Chain: Generate → Count → Echo",
-      prompt:
-        "Please chain these operations: 1) Generate a greeting message, 2) Count the words in that generated message, 3) Echo back the word count result. Pass the output from each step to the next.",
-    },
-    {
-      label: "Chain: Reverse → Echo → Uppercase",
-      prompt:
-        "Chain these tools step by step: 1) Reverse the text 'AI SDK', 2) Echo the reversed result, 3) Convert the echoed result to uppercase. Each step should use the output from the previous step.",
-    },
-  ]
-
-  const handleQuickAction = (prompt: string) => {
-    // Set the input and trigger form submission
-    const event = new Event("submit", { bubbles: true, cancelable: true })
-    const form = document.querySelector("form")
-    if (form) {
-      const inputElement = form.querySelector('input[type="text"]') as HTMLInputElement
-      if (inputElement) {
-        inputElement.value = prompt
-        handleInputChange({ target: { value: prompt } } as any)
-        setTimeout(() => {
-          form.dispatchEvent(event)
-        }, 100)
-      }
-    }
   }
 
   return (
@@ -156,6 +127,35 @@ export default function MCPToolsChat() {
                 </div>
               )}
 
+              {/* Tool Permission Toggle */}
+              {mcpConfig.type !== "none" && (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {autoApproveTools ? (
+                        <ShieldCheck className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Shield className="h-4 w-4 text-orange-600" />
+                      )}
+                      <Label htmlFor="auto-approve" className="text-sm font-medium">
+                        Auto-approve tools
+                      </Label>
+                    </div>
+                    <Toggle
+                      id="auto-approve"
+                      pressed={autoApproveTools}
+                      onPressedChange={setAutoApproveTools}
+                      aria-label="Auto-approve tool usage"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {autoApproveTools
+                      ? "AI will use tools automatically without asking for permission"
+                      : "AI will ask for permission before using any tool (recommended)"}
+                  </p>
+                </div>
+              )}
+
               <Button onClick={updateMcpConfig} className="w-full" size="sm">
                 Apply Configuration
               </Button>
@@ -168,33 +168,16 @@ export default function MCPToolsChat() {
                   </Badge>
                 </div>
                 {mcpConfig.type !== "none" && (
-                  <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={autoApproveTools ? "default" : "secondary"} className="text-xs">
+                        {autoApproveTools ? "Auto-approved" : "Permission required"}
+                      </Badge>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {/* Quick Actions */}
-              {mcpConfig.type !== "none" && (
-                <div className="pt-2 border-t">
-                  <Label className="text-xs font-medium mb-2 block">Quick Tool Chains:</Label>
-                  <div className="space-y-2">
-                    {quickActions.map((action, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs h-auto py-2 px-2 bg-transparent"
-                        onClick={() => handleQuickAction(action.prompt)}
-                        disabled={isLoading}
-                      >
-                        <div className="flex items-center gap-1">
-                          <ArrowRight className="h-3 w-3" />
-                          <span className="text-left">{action.label}</span>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -231,18 +214,24 @@ export default function MCPToolsChat() {
                     {mcpConfig.type !== "none" && (
                       <div className="mt-4">
                         <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
-                        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-sm font-medium text-blue-800 mb-2">💡 Tool Chaining Tip:</p>
-                          <p className="text-xs text-blue-700">
-                            To chain tools together, be explicit: "First do X, then use that result for Y, then use that
-                            result for Z"
-                          </p>
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                          {autoApproveTools ? (
+                            <Badge variant="default" className="text-xs">
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                              Tools auto-approved
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Shield className="h-3 w-3 mr-1" />
+                              Permission required for tools
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     )}
                     <div className="mt-4 text-xs text-gray-400">
-                      <p>Try the quick actions on the left, or ask:</p>
-                      <p>"Chain: echo 'hello' → reverse result → uppercase result"</p>
+                      <p>Try: "Hello, can you help me?"</p>
+                      {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
                     </div>
                   </div>
                 )}
@@ -257,116 +246,51 @@ export default function MCPToolsChat() {
                       <div className="whitespace-pre-wrap">{message.content}</div>
                       {message.toolInvocations && message.toolInvocations.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <p className="text-xs text-gray-500">
-                              Tool Chain ({message.toolInvocations.length} steps):
-                            </p>
-                            <div className="flex items-center gap-1">
-                              {message.toolInvocations.map((_, index) => (
-                                <div key={index} className="flex items-center">
-                                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                                  {index < message.toolInvocations.length - 1 && (
-                                    <ArrowRight className="h-3 w-3 text-gray-400 mx-1" />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            {message.toolInvocations.map((tool, index) => {
-                              // Extract content from tool result
-                              let displayContent = "No result"
-                              let hasError = false
+                          <p className="text-xs text-gray-500 mb-2">Tools used:</p>
+                          {message.toolInvocations.map((tool, index) => {
+                            // Extract content from tool result
+                            let displayContent = "No result"
 
-                              if (tool.result) {
-                                try {
-                                  // Handle different result formats
-                                  if (typeof tool.result === "string") {
-                                    displayContent = tool.result
-                                  } else if (tool.result.content) {
-                                    // Handle MCP format with content array
-                                    if (Array.isArray(tool.result.content)) {
-                                      displayContent = tool.result.content
-                                        .map((item: any) => item.text || item.content || JSON.stringify(item))
-                                        .join(" ")
-                                    } else if (typeof tool.result.content === "string") {
-                                      displayContent = tool.result.content
-                                    } else {
-                                      displayContent = JSON.stringify(tool.result.content)
-                                    }
-                                  } else if (tool.result.text) {
-                                    displayContent = tool.result.text
-                                  } else if (tool.result.error) {
-                                    displayContent = `Error: ${tool.result.error}`
-                                    hasError = true
+                            if (tool.result) {
+                              try {
+                                // Handle different result formats
+                                if (typeof tool.result === "string") {
+                                  displayContent = tool.result
+                                } else if (tool.result.content) {
+                                  // Handle MCP format with content array
+                                  if (Array.isArray(tool.result.content)) {
+                                    displayContent = tool.result.content
+                                      .map((item: any) => item.text || item.content || JSON.stringify(item))
+                                      .join(" ")
+                                  } else if (typeof tool.result.content === "string") {
+                                    displayContent = tool.result.content
                                   } else {
-                                    // Fallback for other formats
-                                    displayContent = JSON.stringify(tool.result)
+                                    displayContent = JSON.stringify(tool.result.content)
                                   }
-                                } catch (e) {
-                                  displayContent = `Error parsing result: ${String(tool.result)}`
-                                  hasError = true
+                                } else if (tool.result.text) {
+                                  displayContent = tool.result.text
+                                } else {
+                                  // Fallback for other formats
+                                  displayContent = JSON.stringify(tool.result)
                                 }
-                              } else if (tool.state === "call") {
-                                displayContent = "Tool called, waiting for result..."
+                              } catch (e) {
+                                displayContent = String(tool.result)
                               }
+                            }
 
-                              return (
-                                <div key={index} className="border rounded-md p-2 bg-gray-50 relative">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex items-center gap-1">
-                                        <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                          {index + 1}
-                                        </div>
-                                        <Badge variant="outline" className="text-xs">
-                                          {tool.toolName}
-                                        </Badge>
-                                      </div>
-                                      {index > 0 && (
-                                        <Badge variant="secondary" className="text-xs">
-                                          Uses output from step {index}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {tool.args && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {Object.keys(tool.args).length} args
-                                      </Badge>
-                                    )}
-                                  </div>
-
-                                  {/* Show tool arguments if available */}
-                                  {tool.args && Object.keys(tool.args).length > 0 && (
-                                    <div className="mb-2 p-2 bg-gray-100 rounded text-xs">
-                                      <span className="font-medium text-gray-600">Input: </span>
-                                      <span className="font-mono">
-                                        {Object.entries(tool.args)
-                                          .map(([key, value]) => `${key}: "${value}"`)
-                                          .join(", ")}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Show tool result */}
-                                  <div
-                                    className={`p-2 rounded-md border-l-2 ${
-                                      hasError ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"
-                                    }`}
-                                  >
-                                    <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
-                                  </div>
-
-                                  {/* Arrow to next step */}
-                                  {index < message.toolInvocations.length - 1 && (
-                                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-white border rounded-full p-1">
-                                      <ArrowRight className="h-3 w-3 text-blue-500" />
-                                    </div>
-                                  )}
+                            return (
+                              <div key={index} className="mb-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {tool.toolName}
+                                  </Badge>
                                 </div>
-                              )
-                            })}
-                          </div>
+                                <div className="p-2 bg-blue-50 rounded-md border-l-2 border-blue-200">
+                                  <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -405,35 +329,43 @@ export default function MCPToolsChat() {
         {/* Instructions */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-lg">How to Chain MCP Tools</CardTitle>
+            <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-semibold mb-2 text-yellow-800">🔗 Tool Chaining</h4>
-              <p className="text-sm text-yellow-700 mb-2">
-                To chain tools together (where output of one becomes input of the next), be very explicit in your
-                request:
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-semibold mb-2 text-blue-800 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Tool Permission System
+              </h4>
+              <p className="text-sm text-blue-700 mb-2">
+                By default, the AI will ask for your permission before using any tool. This ensures you have control
+                over what actions are performed.
               </p>
-              <div className="bg-yellow-100 p-2 rounded text-xs font-mono text-yellow-800">
-                "Please do this step by step: 1) First echo 'hello world', 2) Then reverse the result from step 1, 3)
-                Then uppercase the result from step 2"
-              </div>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">✅ Good Chaining Examples</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Chain: echo 'test' → reverse the echoed result → uppercase the reversed result"</li>
-                <li>• "Step 1: Generate a greeting. Step 2: Count words in that greeting. Step 3: Echo the count."</li>
+              <ul className="text-sm text-blue-700 space-y-1">
                 <li>
-                  • "Process 'hello' by first echoing it, then pass that result to reverse, then pass that to uppercase"
+                  • <strong>Permission Required (Default):</strong> AI asks before using tools
+                </li>
+                <li>
+                  • <strong>Auto-approve:</strong> AI uses tools automatically without asking
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-2">❌ What Doesn't Work</h4>
+              <h4 className="font-semibold mb-2">Quick Test</h4>
+              <p className="text-sm text-gray-600 mb-2">Try these simple prompts first to test the connection:</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Echo, reverse, and uppercase 'hello world'" (all tools get same input)</li>
-                <li>• "Use multiple tools on this text" (unclear chaining)</li>
+                <li>• "Hello, how are you?"</li>
+                <li>• "What can you help me with?"</li>
+                <li>• "Tell me a joke"</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">With Echo MCP Server</h4>
+              <p className="text-sm text-gray-600 mb-2">If you have the echo server running, try:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• "Can you echo the text 'Hello World'?"</li>
+                <li>• "Reverse the text 'OpenAI'"</li>
+                <li>• "Convert 'hello world' to uppercase"</li>
               </ul>
             </div>
           </CardContent>

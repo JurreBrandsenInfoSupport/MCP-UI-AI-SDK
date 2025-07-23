@@ -37,25 +37,24 @@ export async function POST(req: Request) {
       const tools = mcpClient ? await mcpClient.tools() : {}
       console.log("Available tools:", Object.keys(tools))
 
+      // Create system prompt based on tool permission settings
+      let systemPrompt = "You are a helpful AI assistant."
+
+      if (mcpConfig?.type !== "none" && Object.keys(tools).length > 0) {
+        if (mcpConfig.autoApproveTools) {
+          systemPrompt +=
+            " You have access to various tools and can use them freely to help the user. Use tools when they would be helpful to answer the user's request."
+        } else {
+          systemPrompt +=
+            " You have access to various tools, but you must ask for the user's permission before using any tool. When you want to use a tool, first explain what tool you want to use and why, then ask 'May I use the [tool name] tool to [purpose]?' and wait for the user's approval before proceeding."
+        }
+      }
+
       const result = streamText({
         model: azure("gpt-4o"),
-        system: `You are a helpful AI assistant with access to various tools. When a user asks you to chain or sequence multiple operations:
-
-1. ALWAYS execute ALL requested tools in the specified order
-2. Use the output from one tool as the input to the next tool
-3. Continue making tool calls until all requested operations are complete
-4. If a user asks for step-by-step operations, execute each step sequentially
-5. Don't stop after the first tool call - continue with subsequent tools using previous results
-
-For example, if asked to "echo 'hello' then reverse the result then uppercase it":
-- First call echo with 'hello'
-- Then call reverse with the echo result
-- Then call uppercase with the reverse result
-
-Always complete the full chain of operations as requested.`,
+        system: systemPrompt,
         messages,
-        tools,
-        maxSteps: 10, // Allow multiple sequential tool calls
+        tools: mcpConfig?.autoApproveTools ? tools : {}, // Only provide tools if auto-approved
         onFinish: async () => {
           console.log("Stream finished")
           // Close MCP client when response is finished
@@ -80,9 +79,7 @@ Always complete the full chain of operations as requested.`,
       console.log("Falling back to regular AI response")
       const result = streamText({
         model: azure("gpt-4o"),
-        system: `You are a helpful AI assistant. When users ask about tool operations or chaining, explain that MCP tools are not currently available and suggest they check the configuration.`,
         messages,
-        maxSteps: 10,
       })
 
       return result.toDataStreamResponse()
