@@ -189,51 +189,86 @@ export default function MCPToolsChat() {
                       <div className="whitespace-pre-wrap">{message.content}</div>
                       {message.toolInvocations && message.toolInvocations.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500 mb-2">Tools used:</p>
-                          {message.toolInvocations.map((tool, index) => {
-                            // Extract content from tool result
-                            let displayContent = "No result"
+                          <p className="text-xs text-gray-500 mb-2">Tools used ({message.toolInvocations.length}):</p>
+                          <div className="space-y-2">
+                            {message.toolInvocations.map((tool, index) => {
+                              // Extract content from tool result
+                              let displayContent = "No result"
+                              let hasError = false
 
-                            if (tool.result) {
-                              try {
-                                // Handle different result formats
-                                if (typeof tool.result === "string") {
-                                  displayContent = tool.result
-                                } else if (tool.result.content) {
-                                  // Handle MCP format with content array
-                                  if (Array.isArray(tool.result.content)) {
-                                    displayContent = tool.result.content
-                                      .map((item: any) => item.text || item.content || JSON.stringify(item))
-                                      .join(" ")
-                                  } else if (typeof tool.result.content === "string") {
-                                    displayContent = tool.result.content
+                              if (tool.result) {
+                                try {
+                                  // Handle different result formats
+                                  if (typeof tool.result === "string") {
+                                    displayContent = tool.result
+                                  } else if (tool.result.content) {
+                                    // Handle MCP format with content array
+                                    if (Array.isArray(tool.result.content)) {
+                                      displayContent = tool.result.content
+                                        .map((item: any) => item.text || item.content || JSON.stringify(item))
+                                        .join(" ")
+                                    } else if (typeof tool.result.content === "string") {
+                                      displayContent = tool.result.content
+                                    } else {
+                                      displayContent = JSON.stringify(tool.result.content)
+                                    }
+                                  } else if (tool.result.text) {
+                                    displayContent = tool.result.text
+                                  } else if (tool.result.error) {
+                                    displayContent = `Error: ${tool.result.error}`
+                                    hasError = true
                                   } else {
-                                    displayContent = JSON.stringify(tool.result.content)
+                                    // Fallback for other formats
+                                    displayContent = JSON.stringify(tool.result)
                                   }
-                                } else if (tool.result.text) {
-                                  displayContent = tool.result.text
-                                } else {
-                                  // Fallback for other formats
-                                  displayContent = JSON.stringify(tool.result)
+                                } catch (e) {
+                                  displayContent = `Error parsing result: ${String(tool.result)}`
+                                  hasError = true
                                 }
-                              } catch (e) {
-                                displayContent = String(tool.result)
+                              } else if (tool.state === "call") {
+                                displayContent = "Tool called, waiting for result..."
                               }
-                            }
 
-                            return (
-                              <div key={index} className="mb-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {tool.toolName}
-                                  </Badge>
+                              return (
+                                <div key={index} className="border rounded-md p-2 bg-gray-50">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        {tool.toolName}
+                                      </Badge>
+                                      <span className="text-xs text-gray-400">#{index + 1}</span>
+                                    </div>
+                                    {tool.args && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {Object.keys(tool.args).length} args
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {/* Show tool arguments if available */}
+                                  {tool.args && Object.keys(tool.args).length > 0 && (
+                                    <div className="mb-2 p-2 bg-gray-100 rounded text-xs">
+                                      <span className="font-medium text-gray-600">Input: </span>
+                                      <span className="font-mono">
+                                        {Object.entries(tool.args)
+                                          .map(([key, value]) => `${key}: "${value}"`)
+                                          .join(", ")}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Show tool result */}
+                                  <div
+                                    className={`p-2 rounded-md border-l-2 ${
+                                      hasError ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"
+                                    }`}
+                                  >
+                                    <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+                                  </div>
                                 </div>
-                                <div className="p-2 bg-blue-50 rounded-md border-l-2 border-blue-200">
-                                  <div className="text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
-                                </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -291,6 +326,17 @@ export default function MCPToolsChat() {
                 <li>• "Can you echo the text 'Hello World'?"</li>
                 <li>• "Reverse the text 'OpenAI'"</li>
                 <li>• "Convert 'hello world' to uppercase"</li>
+                <li>• "Echo 'Hello', then reverse 'World', and count words in 'AI is amazing'"</li>
+                <li>• "Generate a formal greeting and then echo it back to me"</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">Multiple Tool Usage</h4>
+              <p className="text-sm text-gray-600 mb-2">The AI can use multiple tools in a single response:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• "Process 'hello world' by echoing it, reversing it, and making it uppercase"</li>
+                <li>• "Generate a greeting, then count the words in it"</li>
+                <li>• "Echo 'AI', reverse 'SDK', and uppercase 'mcp tools'"</li>
               </ul>
             </div>
           </CardContent>
