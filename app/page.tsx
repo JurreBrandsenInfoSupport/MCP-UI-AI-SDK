@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Settings, MessageSquare, Wrench } from "lucide-react"
+import { MCPServerInstructions } from "@/components/mcp-server-instructions"
 
 interface MCPConfig {
   type: "none" | "stdio" | "sse"
@@ -206,34 +207,7 @@ export default function MCPToolsChat() {
         </div>
 
         {/* Instructions */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-lg">How to Use MCP Tools</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">Server-Sent Events (SSE)</h4>
-              <p className="text-sm text-gray-600">
-                Connect to an MCP server that supports SSE transport. Enter the server URL and apply the configuration.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">Standard I/O (stdio)</h4>
-              <p className="text-sm text-gray-600">
-                Connect to an MCP server using standard input/output. Specify the command and arguments to run the
-                server.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">Example Prompts</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• "Find products under $100" (if you have an e-commerce MCP server)</li>
-                <li>• "Get the weather for New York" (if you have a weather MCP server)</li>
-                <li>• "Search for recent news about AI" (if you have a news MCP server)</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+        <MCPServerInstructions />
       </div>
     </div>
   )
