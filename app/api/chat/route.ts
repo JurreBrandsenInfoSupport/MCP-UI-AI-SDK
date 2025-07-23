@@ -39,8 +39,23 @@ export async function POST(req: Request) {
 
       const result = streamText({
         model: azure("gpt-4o"),
+        system: `You are a helpful AI assistant with access to various tools. When a user asks you to chain or sequence multiple operations:
+
+1. ALWAYS execute ALL requested tools in the specified order
+2. Use the output from one tool as the input to the next tool
+3. Continue making tool calls until all requested operations are complete
+4. If a user asks for step-by-step operations, execute each step sequentially
+5. Don't stop after the first tool call - continue with subsequent tools using previous results
+
+For example, if asked to "echo 'hello' then reverse the result then uppercase it":
+- First call echo with 'hello'
+- Then call reverse with the echo result
+- Then call uppercase with the reverse result
+
+Always complete the full chain of operations as requested.`,
         messages,
         tools,
+        maxSteps: 10, // Allow multiple sequential tool calls
         onFinish: async () => {
           console.log("Stream finished")
           // Close MCP client when response is finished
@@ -65,7 +80,9 @@ export async function POST(req: Request) {
       console.log("Falling back to regular AI response")
       const result = streamText({
         model: azure("gpt-4o"),
+        system: `You are a helpful AI assistant. When users ask about tool operations or chaining, explain that MCP tools are not currently available and suggest they check the configuration.`,
         messages,
+        maxSteps: 10,
       })
 
       return result.toDataStreamResponse()
