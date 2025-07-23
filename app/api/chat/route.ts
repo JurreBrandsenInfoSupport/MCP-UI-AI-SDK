@@ -1,6 +1,6 @@
 import { experimental_createMCPClient, streamText } from "ai"
 import { Experimental_StdioMCPTransport } from "ai/mcp-stdio"
-import { openai } from "@ai-sdk/openai"
+import { azure } from "@ai-sdk/azure"
 
 export const maxDuration = 30
 
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       console.log("Available tools:", Object.keys(tools))
 
       const result = streamText({
-        model: openai("gpt-4o"),
+        model: azure("gpt-4o"),
         messages,
         tools,
         onFinish: async () => {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       // Fallback to regular AI response without MCP tools
       console.log("Falling back to regular AI response")
       const result = streamText({
-        model: openai("gpt-4o"),
+        model: azure("gpt-4o"),
         messages,
       })
 
