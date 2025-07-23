@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       console.log("Available tools:", Object.keys(tools))
 
       const result = await streamText({
-        model: azure("gpt-4o"),
+        model: azure("gpt-4.1"),
         messages,
         tools: mcpConfig?.type !== "none" ? tools : undefined,
       })
