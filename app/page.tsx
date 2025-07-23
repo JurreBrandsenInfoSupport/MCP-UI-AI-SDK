@@ -23,6 +23,8 @@ import {
   Search,
   CheckCircle,
   XCircle,
+  Send,
+  Bot,
 } from "lucide-react"
 
 interface MCPConfig {
@@ -66,7 +68,9 @@ export default function MCPToolsChat() {
   const [mcpConfig, setMcpConfig] = useState<MCPConfig>({ type: "none" })
   const [sseUrl, setSseUrl] = useState("http://localhost:3000/sse")
   const [stdioCommand, setStdioCommand] = useState("node")
-  const [stdioArgs, setStdioArgs] = useState("scripts/echo-mcp-server.js")
+  const [stdioArgs, setStdioArgs] = useState(
+    "C:\\Users\\JurreB\\Documents\\innovation\\zendesk-mcp-server\\src\\index.js",
+  )
   const [tickets, setTickets] = useState<ZendeskTicket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<ZendeskTicket | null>(null)
   const [selectedUser, setSelectedUser] = useState<ZendeskUser | null>(null)
@@ -80,8 +84,9 @@ export default function MCPToolsChat() {
   })
   const [searchQuery, setSearchQuery] = useState("")
   const [isMocked, setIsMocked] = useState(false)
+  const [activeTab, setActiveTab] = useState("tickets")
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages, setInput } = useChat({
     api: "/api/chat",
     body: { mcpConfig },
     onError: (error) => {
@@ -190,6 +195,37 @@ export default function MCPToolsChat() {
     fetchUser(ticket.submitter_id)
   }
 
+  const sendTicketToChat = () => {
+    if (!selectedTicket || !selectedUser) return
+
+    // Create a comprehensive ticket context message
+    const ticketContext = `Please analyze this Zendesk ticket:
+
+**Ticket #${selectedTicket.id}: ${selectedTicket.subject}**
+
+**Status:** ${selectedTicket.status}
+**Priority:** ${selectedTicket.priority || "Not set"}
+**Type:** ${selectedTicket.type || "Not set"}
+**Created:** ${new Date(selectedTicket.created_at).toLocaleString()}
+**Updated:** ${new Date(selectedTicket.updated_at).toLocaleString()}
+
+**Description:**
+${selectedTicket.description}
+
+**Submitter Information:**
+- Name: ${formatUserName(selectedUser.name)}
+- Email: ${selectedUser.email}
+- User ID: ${selectedUser.id}
+- Role: ${selectedUser.role || "Not specified"}
+- Time Zone: ${selectedUser.time_zone || "Not specified"}
+- Member Since: ${new Date(selectedUser.created_at).toLocaleDateString()}
+
+Please provide insights about this ticket, suggest potential solutions, and identify any patterns or issues that might need attention.`
+
+    setInput(ticketContext)
+    setActiveTab("chat")
+  }
+
   const updateMcpConfig = () => {
     const config: MCPConfig = { type: mcpConfig.type }
 
@@ -271,7 +307,7 @@ export default function MCPToolsChat() {
           )}
         </div>
 
-        <Tabs defaultValue="tickets" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tickets" className="flex items-center gap-2">
               <Ticket className="h-4 w-4" />
@@ -391,10 +427,18 @@ export default function MCPToolsChat() {
               {/* Ticket Details */}
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Ticket className="h-5 w-5" />
-                    {selectedTicket ? `Ticket #${selectedTicket.id}` : "Select a Ticket"}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Ticket className="h-5 w-5" />
+                      {selectedTicket ? `Ticket #${selectedTicket.id}` : "Select a Ticket"}
+                    </CardTitle>
+                    {selectedTicket && selectedUser && (
+                      <Button onClick={sendTicketToChat} className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        Analyze with AI
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {selectedTicket ? (
@@ -566,12 +610,13 @@ export default function MCPToolsChat() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="stdio-args">Arguments</Label>
+                        <Label htmlFor="stdio-args">Zendesk MCP Server Path</Label>
                         <Input
                           id="stdio-args"
                           value={stdioArgs}
                           onChange={(e) => setStdioArgs(e.target.value)}
-                          placeholder="scripts/echo-mcp-server.js"
+                          placeholder="C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js"
+                          className="text-xs"
                         />
                       </div>
                     </div>
@@ -589,7 +634,7 @@ export default function MCPToolsChat() {
                       </Badge>
                     </div>
                     {mcpConfig.type !== "none" && (
-                      <p className="text-xs text-gray-500">MCP tools will be available to the AI assistant</p>
+                      <p className="text-xs text-gray-500">Zendesk MCP tools will be available to the AI assistant</p>
                     )}
                   </div>
                 </CardContent>
@@ -600,7 +645,7 @@ export default function MCPToolsChat() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MessageSquare className="h-5 w-5" />
-                    Chat
+                    Chat with Zendesk MCP
                     {error && (
                       <Badge variant="destructive" className="ml-auto">
                         <AlertCircle className="h-3 w-3 mr-1" />
@@ -626,11 +671,11 @@ export default function MCPToolsChat() {
                         <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                         <p>Start a conversation with the AI assistant</p>
                         {mcpConfig.type !== "none" && (
-                          <p className="text-sm mt-2">MCP tools are enabled and ready to use</p>
+                          <p className="text-sm mt-2">Zendesk MCP tools are enabled and ready to use</p>
                         )}
                         <div className="mt-4 text-xs text-gray-400">
-                          <p>Try: "Hello, can you help me?"</p>
-                          {mcpConfig.type === "stdio" && <p>Or: "Echo the text 'Hello World'"</p>}
+                          <p>Try: "Analyze the current tickets" or "What are the most common issues?"</p>
+                          <p>Or select a ticket and click "Analyze with AI" to get detailed insights</p>
                         </div>
                       </div>
                     )}
@@ -650,7 +695,7 @@ export default function MCPToolsChat() {
                           <div className="whitespace-pre-wrap">{message.content}</div>
                           {message.toolInvocations && message.toolInvocations.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-gray-200">
-                              <p className="text-xs text-gray-500 mb-2">Tools used:</p>
+                              <p className="text-xs text-gray-500 mb-2">Zendesk MCP Tools used:</p>
                               {message.toolInvocations.map((tool, index) => {
                                 let displayContent = "No result"
 
@@ -702,7 +747,7 @@ export default function MCPToolsChat() {
                         <div className="bg-white text-gray-900 shadow-sm border p-3 rounded-lg">
                           <div className="flex items-center gap-2">
                             <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                            <span>AI is thinking...</span>
+                            <span>AI is analyzing with Zendesk MCP...</span>
                           </div>
                         </div>
                       </div>
@@ -714,12 +759,12 @@ export default function MCPToolsChat() {
                     <Input
                       value={input}
                       onChange={handleInputChange}
-                      placeholder="Ask the AI assistant anything..."
+                      placeholder="Ask about tickets, analyze patterns, or get insights..."
                       disabled={isLoading}
                       className="flex-1"
                     />
                     <Button type="submit" disabled={isLoading || !input.trim()}>
-                      Send
+                      <Send className="h-4 w-4" />
                     </Button>
                   </form>
                 </CardFooter>
@@ -747,23 +792,37 @@ export default function MCPToolsChat() {
                 ZENDESK_API_TOKEN=your-api-token
               </div>
             </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-semibold mb-2 text-blue-800">Zendesk MCP Server Setup</h4>
+              <p className="text-sm text-blue-700 mb-2">Your Zendesk MCP server path is pre-configured. Make sure:</p>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• The MCP server is running and accessible</li>
+                <li>• Node.js is installed and in your PATH</li>
+                <li>
+                  • The server path is correct:{" "}
+                  <code className="bg-blue-100 px-1 rounded">
+                    C:\Users\JurreB\Documents\innovation\zendesk-mcp-server\src\index.js
+                  </code>
+                </li>
+              </ul>
+            </div>
             <div>
               <h4 className="font-semibold mb-2">Features</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>
-                  • <strong>Connection Testing:</strong> Test your Zendesk credentials before using the app
+                  • <strong>Ticket Analysis:</strong> Click "Analyze with AI" on any ticket for detailed insights
                 </li>
                 <li>
-                  • <strong>Ticket Search:</strong> Search through tickets using Zendesk's search API
+                  • <strong>MCP Integration:</strong> Use your Zendesk MCP server for advanced ticket operations
                 </li>
                 <li>
-                  • <strong>Enhanced Error Handling:</strong> Better error messages and fallback to mock data
+                  • <strong>Context-Aware Chat:</strong> AI has access to ticket descriptions, user info, and status
                 </li>
                 <li>
-                  • <strong>Improved Client:</strong> Robust Zendesk client with proper authentication
+                  • <strong>Pattern Recognition:</strong> Ask the AI to identify trends and common issues
                 </li>
                 <li>
-                  • <strong>MCP Chat:</strong> Use Model Context Protocol tools for advanced interactions
+                  • <strong>Solution Suggestions:</strong> Get AI-powered recommendations for ticket resolution
                 </li>
               </ul>
             </div>
