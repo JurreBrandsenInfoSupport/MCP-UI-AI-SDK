@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       console.log("Available tools:", Object.keys(tools))
 
       const result = await streamText({
-        model: azure("gpt-4o"),
+        model: azure("gpt-4.1"),
         messages,
         tools: mcpConfig?.type !== "none" ? tools : undefined,
       })
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       // Fallback to regular AI response without MCP tools
       console.log("Falling back to regular AI response")
       const result = await streamText({
-        model: azure("gpt-4o"),
+        model: azure("gpt-4.1"),
         messages,
       })
 
